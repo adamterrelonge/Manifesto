@@ -1,0 +1,240 @@
+# Manifesto — UK Culture & Events Aggregator
+
+## 1. One-line pitch
+
+A single map/list/card interface that aggregates the UK's events, openings and screenings from mainstream ticketing APIs *and* the independent creators who only post to their Instagram/Linktree — then tags everything against community-relevant buckets (POC, Queer, Black, Latinx, Disability-friendly, Autistic-friendly, etc.) so people can actually find the spaces built for them.
+
+## 2. Why this exists
+
+Mainstream discovery apps (Eventbrite, Time Out, Google) are dominated by whoever pays for placement or has the ops capacity to list on every platform. The events that matter most to underrepresented communities are frequently:
+
+- Run by small/independent organisers with no budget for Eventbrite Pro
+- Announced only via Instagram story / link-in-bio / WhatsApp broadcast
+- Missing any structured metadata about who they're for or how accessible they are
+
+This project treats **aggregation + inclusive categorisation** as the core product, not a feature bolted onto a generic listings app. The explicit focus on Blackness is a first-class design constraint, not an afterthought bucket.
+
+## 3. Goals
+
+1. **Coverage** — pull as much of "what's on in the UK" as possible from free/cheap APIs, refreshed on a schedule.
+2. **Long tail** — surface independent creator events that never touch a ticketing platform, via link-in-bio scraping.
+3. **Normalisation** — merge wildly different source schemas into one clean `Event` model, dedupe cross-posted events.
+4. **Inclusive categorisation** — an AI classification layer that tags events into identity/accessibility buckets, with Blackness as a primary lens, not a checkbox.
+5. **Multi-modal discovery** — list, card grid, and map/pin views of the same underlying data.
+6. **Personalisation** — accounts, saved locations, favourites, ratings, proximity/interest-based notifications.
+
+## 4. Non-goals (for now)
+
+- Being a ticketing/payments platform (always deep-link out to the source for booking).
+- International coverage — UK-only for v1, architecture should not prevent expansion beyond the UK later.
+- Uniform density across the country on day one — real-world event volume will skew toward London, Manchester, Birmingham, Bristol, Glasgow, etc. first; treat lower-density regions as organic growth from community submissions and the bio-link scraper, not a launch blocker.
+- Building a general-purpose scraper framework — the bio-link scraper only needs to handle a known, curated set of creator profiles + common platforms (Linktree, Beacons, Instagram bio, plain personal sites).
+
+---
+
+## 5. High-level architecture
+
+```
+┌──────────────────┐   ┌──────────────────┐   ┌───────────────────────┐
+│  Source Adapters  │   │  Bio-Link Scraper │   │  Manual/Community     │
+│  (Ticketmaster,   │   │  (curated creator │   │  Submissions          │
+│  Skiddle, Dice,    │   │   list + crawler) │   │  (form, later app)    │
+│  RA, Meetup, ...)  │   └────────┬─────────┘   └───────────┬───────────┘
+└────────┬──────────┘            │                          │
+         │                       │                          │
+         └───────────────┬───────┴──────────────┬───────────┘
+                          ▼
+                 ┌──────────────────┐
+                 │  Ingestion Queue  │  (normalise → raw_events table)
+                 └────────┬─────────┘
+                          ▼
+                 ┌──────────────────┐
+                 │  Normalisation &  │  (schema mapping, geocoding,
+                 │  Dedup Pipeline   │   date/time parsing, venue match)
+                 └────────┬─────────┘
+                          ▼
+                 ┌──────────────────┐
+                 │  AI Enrichment    │  (categorisation buckets,
+                 │  Layer            │   summary, accessibility flags,
+                 │                   │   confidence scores)
+                 └────────┬─────────┘
+                          ▼
+                 ┌──────────────────┐
+                 │  Events Database  │  (Postgres + PostGIS for geo)
+                 └────────┬─────────┘
+                          ▼
+        ┌─────────────────┼──────────────────┐
+        ▼                 ▼                  ▼
+   ┌─────────┐      ┌───────────┐      ┌────────────┐
+   │  API /    │      │  Web App   │      │ Notification│
+   │  tRPC     │◄────┤ (Next.js)  │      │  Service     │
+   │  layer    │      │ List/Cards/│      │ (push/email) │
+   └─────────┘      │  Map views │      └────────────┘
+                     └───────────┘
+```
+
+### Suggested stack (fits the existing Next.js app in this repo)
+
+- **Frontend**: Next.js (App Router) — already scaffolded here — with a map view via MapLibre GL / Mapbox GL JS.
+- **Backend**: Next.js Route Handlers or a separate small Node service for scheduled ingestion (cron jobs don't belong in request-response serverless functions).
+- **Database**: Postgres + PostGIS (Supabase is a good free-tier fit: auth + Postgres + storage in one).
+- **Job scheduling**: Vercel Cron / Supabase Edge Functions / a lightweight queue (BullMQ + Redis) for ingestion + scraping jobs.
+- **AI layer**: Claude (or another LLM) called in batch during ingestion — not per-request — to keep cost and latency low. Structured output (JSON mode / tool calls) for bucket tagging.
+- **Auth**: Supabase Auth / Clerk / NextAuth — whichever pairs best with the chosen DB.
+- **Notifications**: Web Push (free) first; email via Resend; SMS/native push later if it becomes an app.
+
+---
+
+## 6. Data sources
+
+| Source | Type | Notes |
+|---|---|---|
+| Ticketmaster Discovery API | Free API | Good for larger venues/gigs; generous free tier |
+| Skiddle API | Free API | Strong UK-wide indie music + club coverage |
+| TicketSource API | Free API | Smaller venues, community events, theatre |
+| Meetup API | Paid/limited free | API access has tightened — verify current terms; may need to fall back to scraping public group pages |
+| Resident Advisor | No official public API | Historically scraped via GraphQL endpoint used by their own site — fragile, ToS-sensitive, treat as a stretch goal with fallback to manual curation |
+| Dice.fm | No official public API | Same caveat as RA — check current ToS before relying on this |
+| Link-in-bio scraper | Custom scraper | See §7 |
+| Manual/community submissions | Form | Cheap way to fill gaps API coverage will always have |
+| Council/local authority open data | Open data (data.gov.uk + individual council portals) | Patchy quality and coverage varies wildly by council, but free and useful for filling regional gaps commercial APIs don't reach — stretch goal, worth a scoping pass per major city |
+| University/student union event boards | Scrape/partner | Big source of indie film screenings, workshops, and POC/queer/Latinx society events that never appear anywhere else — high signal-to-noise for this project's target buckets, worth prioritising once the bio-link scraper pattern exists |
+| Library/community centre programming | Scrape/partner | Councils and libraries run free workshops and cultural programming that rarely gets listed on ticketing platforms — similar shape to the university source, likely reachable via the same scraping pattern |
+
+**Action item before building each adapter**: re-check current ToS/rate limits for RA and Dice specifically, since both have historically restricted scraping and this can change without notice. Where no public API exists, prefer partnering/asking for a data feed over silent scraping, and always keep a manual-submission fallback so the product doesn't depend entirely on gray-area access.
+
+---
+
+## 7. Link-in-bio scraper
+
+**Purpose**: capture events from small creators/organisers who post exclusively to Instagram/TikTok bio links and never touch a ticketing platform.
+
+**Approach**:
+1. Maintain a curated seed list of creator handles/profiles (community-sourced + manually added) rather than crawling all of Instagram — this keeps scope, legal exposure, and noise manageable.
+2. For each seed, resolve their bio link (Linktree, Beacons, Koji, Milkshake, or a plain personal site).
+3. Scrape the resolved page for event-shaped content (dates, venue names, ticket links) using a mix of structured-data parsing (schema.org/Event JSON-LD where present) and an LLM extraction pass on the raw page text for unstructured cases.
+4. Re-crawl on a schedule (e.g. daily) and diff against previously seen content to detect new events.
+5. Route everything through the same normalisation/AI pipeline as API sources.
+
+**Constraints to respect**:
+- Do not scrape Instagram itself directly (against their ToS and technically brittle) — only the external bio-link landing pages, which are built to be publicly linked out to.
+- Respect `robots.txt` and rate-limit aggressively per domain.
+- Store provenance (source URL, scrape timestamp) on every event for transparency and takedown requests.
+- Give creators a way to claim/edit/remove their listing — this turns a scraping liability into a relationship.
+
+---
+
+## 8. Normalisation model
+
+A minimal `Event` shape everything gets mapped into:
+
+```
+Event {
+  id
+  title
+  description
+  start_at / end_at
+  venue: { name, address, lat, lng, city, region }   // region = borough/district/unitary authority depending on locale
+  organiser: { name, source_type, profile_url }
+  category: enum (music, gallery, film, food, workshop, market, ...)
+  price: { is_free, min, max, currency }
+  source: { provider, source_id, source_url, scraped_at }
+  buckets: [ Bucket ]         // see §9
+  accessibility: { step_free, bsl_interpreted, quiet_space, ... }
+  status: draft | published | flagged | expired
+  dedup_group_id                // links duplicate listings of the same event
+}
+```
+
+Dedup strategy: fuzzy-match on (title similarity + venue + date window) across sources; when matched, merge into one canonical event and keep all source links.
+
+---
+
+## 9. AI categorisation layer
+
+**Goal**: not just "is this a gig" but *who is this for, and is it accessible to them*.
+
+- Run as a **batch enrichment step** after normalisation, not live per page-load — cheaper, cacheable, and lets you review/correct output before it's public.
+- Use structured output (tool-call / JSON schema) so buckets are a controlled vocabulary, not free text: `["black", "poc", "queer", "latinx", "disability-friendly", "autistic-friendly", "womxn-led", "free-entry", ...]` — extendable, but keep it a maintained list rather than letting the model invent new tags per event.
+- Each bucket assignment carries a **confidence score** and the **evidence snippet** the model used, so low-confidence tags can be queued for human review instead of silently mis-tagging an event.
+- **Bias/accuracy safeguard**: because these are identity categories tied to real communities, treat this as the highest-scrutiny part of the pipeline:
+  - Never infer identity from an organiser's name/photo alone — require explicit signal in event copy (e.g. "Black queer social", "wheelchair accessible venue, step-free").
+  - Build a review queue where community moderators (starting with yourself) can correct/confirm tags; feed corrections back as few-shot examples to improve future accuracy.
+  - Keep an audit log of tag changes.
+  - Make mis-tagging cheap to fix: any event's buckets should be editable in one click from an admin view.
+- Also generate: a short neutral summary, suggested category, and a spam/quality filter score (to catch scraped junk before it reaches users).
+
+---
+
+## 10. Product surfaces
+
+- **List view** — dense, filterable (date, category, bucket, price, free-text search).
+- **Card view** — visual browsing, image-forward, good for discovery/mobile.
+- **Map view** — pins clustered by density, colour/icon-coded by bucket or category, filter drawer shared with list/card views so all three stay in sync.
+- **Event detail page** — normalised info + always a clear "source" link/attribution + booking CTA out to the origin platform.
+- **Accounts**:
+  - Set home location / commute radius.
+  - Favourite events and venues.
+  - Rate/review attended events.
+  - Follow specific organisers or buckets (e.g. "notify me about Black-owned gallery openings within 3 miles").
+- **Notifications** — push/email when new events match saved filters, with sensible batching (digest, not spam).
+
+---
+
+## 11. Build phases
+
+**Phase 0 — Foundations**
+- Postgres schema (events, venues, organisers, buckets, users).
+- One API adapter end-to-end (Skiddle or Ticketmaster — best free-tier docs) proving ingest → normalise → store → render as a list.
+
+**Phase 1 — Aggregation core**
+- Add remaining API adapters (TicketSource, Meetup, re-verify RA/Dice access).
+- Dedup pipeline.
+- Card + map views.
+
+**Phase 2 — AI enrichment**
+- Batch bucket-tagging pipeline with confidence scores.
+- Admin review queue for tag correction.
+- Spam/quality filtering.
+
+**Phase 3 — Long tail**
+- Curated creator seed list + link-in-bio scraper.
+- Organiser claim/edit flow.
+- Manual community submission form.
+
+**Phase 4 — Accounts & personalisation**
+- Auth, saved location, favourites, ratings.
+- Notification preferences + delivery (web push → email → mobile later).
+
+**Phase 5 — Polish & scale**
+- Performance pass on map rendering at scale (clustering, tile-based loading).
+- City/region pages for SEO (London boroughs, Manchester wards, Glasgow districts, etc.).
+- Analytics on which buckets/areas get the most engagement, to prioritise scraper coverage.
+
+---
+
+## 12. Legal / ethical notes to keep front of mind
+
+- Always attribute source and deep-link to the origin for booking — this project aggregates *discovery*, not ticketing.
+- Re-verify ToS for RA, Dice, and Meetup before shipping scrapers/adapters for them — these have changed access policies before.
+- Give organisers a self-serve way to correct or remove their listing.
+- Identity-bucket tagging touches real communities — bias review (§9) isn't optional polish, it's core scope.
+- Keep a data-retention/deletion policy for user accounts and location data from day one (easier than retrofitting later).
+
+---
+
+## 13. Ideas to take it further
+
+- **Community moderation / trust network**: let verified community members (not just admins) confirm or dispute bucket tags for events near them — crowdsources the highest-scrutiny part of the pipeline.
+- **Report/flag pipeline for mistagging**: a lightweight user-facing "this tag is wrong" flag on any event, feeding the same admin review queue from §9 — beyond internal moderator review, this lets mistagged identity/accessibility buckets get caught fast once there's real traffic, rather than waiting for a moderator to stumble on it.
+- **"Vibe" search**: natural-language query ("chill queer poetry night this weekend near Peckham") mapped to structured filters via LLM, instead of requiring users to manually build filter combinations — pairs well with the existing AI enrichment layer since it's reasoning over the same bucket/category/location fields.
+- **Calendar sync (ICS feed)**: a per-saved-filter ICS feed URL users can subscribe to from Google/Apple/Outlook Calendar — low build effort on top of the existing filter/notification system, and turns a one-off visit into an always-current calendar subscription.
+- **"Cultural calendar" digests**: auto-generated weekly digest per bucket and city ("This week in Black London", "This week in Queer Manchester") shareable as an image/story — doubles as organic distribution for the creators being featured.
+- **Organiser dashboard**: let organisers claim a profile, see their own event's reach, and push updates directly — turns scraped subjects into active contributors and reduces scraper fragility over time.
+- **Accessibility detail, not just a flag**: structured accessibility info (step count, quiet room, BSL, sensory notes) sourced via a short organiser questionnaire, not inferred — more useful than a binary tag.
+- **Route/transport overlay on the map**: TfL API overlay showing step-free tube access to a venue, night bus coverage for late events (and equivalent regional transport data outside London).
+- **"Similar organisers" graph**: once you have enough tagged events, recommend organisers/venues, not just events — helps users build an ongoing relationship with spaces, not just one-off attendance.
+- **International expansion hooks**: keep country-level assumptions (currency, address format, admin-region taxonomy) isolated behind a `country` config so a future Ireland/wider-Europe chapter is a config change, not a rewrite.
+- **Open data export**: a public read-only API/CSV of the aggregated (non-scraped-personal) event data — good for community orgs building their own tools, and good will.
+- **Offline-friendly PWA**: many users at grassroots events are in venues with poor signal — cache today's favourited/nearby events for offline viewing.
+- **Verified-safe-space badge**: beyond identity buckets, a lightweight incident-reporting/verification flow so users can flag whether a space actually lived up to its "safe space" claim — high trust value, needs careful moderation design.
