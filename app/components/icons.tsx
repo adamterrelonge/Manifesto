@@ -1,0 +1,147 @@
+// Hand-built sidebar icons, styled to match the lucide-react icons they
+// replace (24x24 viewBox, round stroke caps/joins, currentColor) — but
+// broken into individually-animatable parts (<g> groups) so each can get
+// its own bespoke group-hover keyframe animation (see globals.css). A
+// stock icon library can't do part-level animation like this without
+// significant wrapping, so these are recreated from scratch instead.
+
+import type { SVGProps } from "react";
+
+const BASE_PROPS = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const FILL_BOX_CENTER = { transformBox: "fill-box", transformOrigin: "center" } as const;
+
+export function FilterIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <line
+        x1="4" y1="6" x2="20" y2="6"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-filter-sift_0.5s_ease-in-out]"
+      />
+      <line
+        x1="7" y1="12" x2="17" y2="12"
+        style={{ ...FILL_BOX_CENTER, animationDelay: "0.06s" }}
+        className="group-hover:[animation:sidebar-filter-sift_0.5s_ease-in-out]"
+      />
+      <line
+        x1="10" y1="18" x2="14" y2="18"
+        style={{ ...FILL_BOX_CENTER, animationDelay: "0.12s" }}
+        className="group-hover:[animation:sidebar-filter-sift_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
+export function ConnectionsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-conn-right_0.5s_ease-in-out]"
+      >
+        <path d="M21 20v-1.5a4 4 0 0 0-2.7-3.78" />
+        <path d="M15 4.14a4 4 0 0 1 0 7.72" />
+      </g>
+      {/* Front person: fully drawn, on top */}
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-conn-left_0.5s_ease-in-out]"
+      >
+        <circle cx="9.5" cy="8" r="3.6" />
+        <path d="M3.5 20v-1.5c0-2.9 2.7-5.2 6-5.2s6 2.3 6 5.2V20" />
+      </g>
+    </svg>
+  );
+}
+
+export function FavouritesIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      {/* 
+        Lucide-compatible, hand-verified symmetric heart.
+        Left Lobe:  (12, 5.25) -> (2, 9.1) -> (12, 21.35)
+        Right Lobe: (12, 21.35) -> (22, 9.1) -> (12, 5.25)
+        Exact mirror symmetry along x = 12 with no seam overlap.
+      */}
+      <path
+        d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-heart-beat_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
+export function NotificationsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={{ transformBox: "fill-box", transformOrigin: "top center" }}
+        className="group-hover:[animation:sidebar-bell-jiggle_0.5s_ease-in-out]"
+      >
+        <path d="M6 8.5a6 6 0 0 1 12 0c0 4.8 1.8 6 1.8 6H4.2S6 13.3 6 8.5" />
+        <path d="M9.5 18a2.5 2.5 0 0 0 5 0" />
+      </g>
+    </svg>
+  );
+}
+
+export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-gear-spin_0.5s_ease-in-out]"
+      >
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" />
+      </g>
+    </svg>
+  );
+}
+
+export function ShuffleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-dice-roll_0.5s_ease-in-out]"
+      >
+        <rect x="3" y="3" width="18" height="18" rx="4" />
+        <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
+        <circle cx="16" cy="8" r="1.1" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+        <circle cx="8" cy="16" r="1.1" fill="currentColor" stroke="none" />
+        <circle cx="16" cy="16" r="1.1" fill="currentColor" stroke="none" />
+      </g>
+    </svg>
+  );
+}
+
+export function GappedArrowIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} strokeWidth={2} strokeLinecap="round" {...props}>
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-arrow-nudge_0.5s_ease-in-out]"
+      >
+        {/* Horizontal line at top-left */}
+        <line x1="10" y1="4" x2="18" y2="4" />
+
+        {/* Vertical line at far right */}
+        <line x1="22" y1="8" x2="22" y2="16" />
+
+        {/* Main diagonal arrow shaft */}
+        <line x1="18" y1="8" x2="8" y2="18" />
+      </g>
+    </svg>
+  );
+}

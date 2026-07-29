@@ -25,3 +25,52 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Sidebar icon hover animations — see app/components/icons.tsx */
+
+@keyframes sidebar-filter-sift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2.5px); }
+}
+
+@keyframes sidebar-conn-left {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-2.5px); }
+}
+
+@keyframes sidebar-conn-right {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(2.5px); }
+}
+
+@keyframes sidebar-heart-beat {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.22); }
+  55% { transform: scale(0.92); }
+  75% { transform: scale(1.08); }
+}
+
+@keyframes sidebar-bell-jiggle {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(-16deg); }
+  35% { transform: rotate(13deg); }
+  55% { transform: rotate(-9deg); }
+  75% { transform: rotate(4deg); }
+}
+
+@keyframes sidebar-gear-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(180deg); }
+}
+
+@keyframes sidebar-dice-roll {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  30% { transform: rotate(-14deg) translateY(-1.5px); }
+  60% { transform: rotate(11deg) translateY(0); }
+  85% { transform: rotate(-4deg); }
+}
+
+@keyframes sidebar-arrow-nudge {
+  0%, 100% { transform: translate(0, 0); }
+  60% { transform: translate(3px, -3px); }
+}
