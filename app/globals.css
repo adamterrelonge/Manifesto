@@ -70,7 +70,29 @@ body {
   85% { transform: rotate(-4deg); }
 }
 
-@keyframes sidebar-arrow-nudge {
+@keyframes sidebar-tag-swing {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-9deg); }
+  60% { transform: rotate(7deg); }
+  85% { transform: rotate(-3deg); }
+}
+
+@keyframes sidebar-grid-pop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+@keyframes sidebar-arrow-top {
   0%, 100% { transform: translate(0, 0); }
-  60% { transform: translate(3px, -3px); }
+  50% { transform: translate(-1.5px, -2px); }
+}
+
+@keyframes sidebar-arrow-side {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(2px, 1.5px); }
+}
+
+@keyframes sidebar-arrow-shaft {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-2px, 2px); }
 }

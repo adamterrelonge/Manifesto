@@ -115,7 +115,6 @@ function toNumber(value: string | number | undefined): number | null {
 const SKIDDLE_CATEGORY_MAP: Record<string, Category> = {
   LIVE: "music",
   CLUB: "music",
-  COMEDY: "comedy",
   THEATRE: "theatre-performance",
   EXHIB: "gallery-exhibition",
   ARTS: "gallery-exhibition",
@@ -134,9 +133,9 @@ const SKIDDLE_CATEGORY_MAP: Record<string, Category> = {
   KIDS: "family-kids",
 };
 
-function normaliseCategory(eventCode: string | undefined): Category {
-  if (!eventCode) return "other";
-  return SKIDDLE_CATEGORY_MAP[eventCode] ?? "other";
+function normaliseCategory(eventCode: string | undefined): Category | null {
+  if (!eventCode) return null;
+  return SKIDDLE_CATEGORY_MAP[eventCode] ?? null;
 }
 
 export function normaliseSkiddleEvent(raw: SkiddleRawEvent): NormalisedEvent {

@@ -2,10 +2,12 @@
 // EventCode / Ticketmaster segment+genre values observed in the live data.
 // Distinct from the identity/accessibility `buckets` — categories describe
 // *what kind* of event this is, buckets describe *who it's for*.
+//
+// "comedy" and "other" were deliberately removed — unmapped/comedy source
+// codes now normalise to null (unclassified) rather than a catch-all.
 
 export type Category =
   | "music"
-  | "comedy"
   | "theatre-performance"
   | "film"
   | "gallery-exhibition"
@@ -13,12 +15,10 @@ export type Category =
   | "workshop-talk"
   | "community-social"
   | "sports"
-  | "family-kids"
-  | "other";
+  | "family-kids";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   music: "Music",
-  comedy: "Comedy",
   "theatre-performance": "Theatre & Performance",
   film: "Film",
   "gallery-exhibition": "Gallery & Exhibition",
@@ -27,7 +27,6 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   "community-social": "Community & Social",
   sports: "Sports",
   "family-kids": "Family & Kids",
-  other: "Other",
 };
 
 const CATEGORY_SET = new Set<string>(Object.keys(CATEGORY_LABELS));

@@ -126,22 +126,85 @@ export function ShuffleIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function PriceIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={{ transformBox: "fill-box", transformOrigin: "7px 7px" }}
+        className="group-hover:[animation:sidebar-tag-swing_0.5s_ease-in-out]"
+      >
+        <path d="M3 3h8l10 10-8 8L3 11V3Z" />
+        <circle cx="7" cy="7" r="1.3" fill="currentColor" stroke="none" />
+      </g>
+    </svg>
+  );
+}
+
+export function CategoryIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <rect
+        x="3" y="3" width="7" height="7" rx="1.5"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+      <rect
+        x="14" y="3" width="7" height="7" rx="1.5"
+        style={{ ...FILL_BOX_CENTER, animationDelay: "0.06s" }}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+      <rect
+        x="3" y="14" width="7" height="7" rx="1.5"
+        style={{ ...FILL_BOX_CENTER, animationDelay: "0.12s" }}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+      <rect
+        x="14" y="14" width="7" height="7" rx="1.5"
+        style={{ ...FILL_BOX_CENTER, animationDelay: "0.18s" }}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
+export function CommunityIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-gear-spin_0.5s_ease-in-out]"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18" />
+        <path d="M12 3c2.5 2.5 4 5.8 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.8-4-9s1.5-6.5 4-9Z" />
+      </g>
+    </svg>
+  );
+}
+
 export function GappedArrowIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...BASE_PROPS} strokeWidth={2} strokeLinecap="round" {...props}>
-      <g
+      {/* Horizontal line at top-left — pulls up/left, away from the corner */}
+      <line
+        x1="10" y1="4" x2="18" y2="4"
         style={FILL_BOX_CENTER}
-        className="group-hover:[animation:sidebar-arrow-nudge_0.5s_ease-in-out]"
-      >
-        {/* Horizontal line at top-left */}
-        <line x1="10" y1="4" x2="18" y2="4" />
+        className="group-hover:[animation:sidebar-arrow-top_0.5s_ease-in-out]"
+      />
 
-        {/* Vertical line at far right */}
-        <line x1="22" y1="8" x2="22" y2="16" />
+      {/* Vertical line at far right — pulls right/down, away from the corner */}
+      <line
+        x1="22" y1="8" x2="22" y2="16"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-arrow-side_0.5s_ease-in-out]"
+      />
 
-        {/* Main diagonal arrow shaft */}
-        <line x1="18" y1="8" x2="8" y2="18" />
-      </g>
+      {/* Main diagonal arrow shaft — pulls down/left, away from the head */}
+      <line
+        x1="18" y1="8" x2="8" y2="18"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-arrow-shaft_0.5s_ease-in-out]"
+      />
     </svg>
   );
 }

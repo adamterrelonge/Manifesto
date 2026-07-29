@@ -109,7 +109,6 @@ function resolveStartAt(raw: TicketmasterEvent): string | null {
 // (Ticketmaster's small fixed top-level set: Music, Sports, Arts & Theatre,
 // Film, Family, Miscellaneous).
 const TICKETMASTER_GENRE_MAP: Record<string, Category> = {
-  Comedy: "comedy",
   Theatre: "theatre-performance",
   Dance: "theatre-performance",
   "Fine Art": "gallery-exhibition",
@@ -125,11 +124,11 @@ const TICKETMASTER_SEGMENT_MAP: Record<string, Category> = {
 function normaliseCategory(
   segment: string | undefined,
   genre: string | undefined
-): Category {
+): Category | null {
   if (genre && TICKETMASTER_GENRE_MAP[genre]) return TICKETMASTER_GENRE_MAP[genre];
   if (segment && TICKETMASTER_SEGMENT_MAP[segment])
     return TICKETMASTER_SEGMENT_MAP[segment];
-  return "other";
+  return null;
 }
 
 export function normaliseTicketmasterEvent(

@@ -10,6 +10,9 @@ import {
   SettingsIcon,
   ShuffleIcon,
   GappedArrowIcon,
+  PriceIcon,
+  CategoryIcon,
+  CommunityIcon,
 } from "@/app/components/icons";
 import { CATEGORY_LABELS, type Category } from "@/lib/categories";
 import { BUCKET_LABELS, NON_QUALIFYING_BUCKETS, type BucketSlug } from "@/lib/buckets";
@@ -56,6 +59,57 @@ const COMMUNITY_BUCKET_ENTRIES = (Object.entries(BUCKET_LABELS) as [BucketSlug, 
   ([slug]) => !NON_QUALIFYING_BUCKETS.includes(slug)
 );
 
+type FilterSection = "price" | "category" | "community";
+
+interface FilterSectionButtonProps {
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  isLast: boolean;
+  isOpen: boolean;
+  badge: string | null;
+  onClick: () => void;
+}
+
+// Shared header row for each collapsible Filter section — styled exactly
+// like the main-menu options (same tree connector, icon, text-base label)
+// plus a chevron and an optional selection-count badge shown only while
+// the section itself is collapsed.
+function FilterSectionButton({
+  label,
+  icon: Icon,
+  isLast,
+  isOpen,
+  badge,
+  onClick,
+}: FilterSectionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full cursor-pointer items-center gap-2 whitespace-nowrap text-left text-[#1f271a]/55 transition-colors duration-200 hover:text-[#1f271a]"
+    >
+      <span aria-hidden className="select-none text-base leading-none">
+        {isLast ? "└──" : "├──"}
+      </span>
+      <Icon aria-hidden className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+      <span className="text-base flex gap-6">{label}</span>
+      {badge && (
+        <span className="rounded-full bg-[#1f271a]/10 px-2 py-0.5 text-xs leading-none normal-case tracking-normal text-[#1f271a]">
+          {badge}
+        </span>
+      )}
+      <span
+        aria-hidden
+        className={`ml-auto text-base leading-none transition-transform duration-300 ${
+          isOpen ? "rotate-180" : ""
+        }`}
+      >
+        ⌄
+      </span>
+    </button>
+  );
+}
+
 interface SidebarProps {
   dateFilter: DateFilter;
   onDateFilterChange: (filter: DateFilter) => void;
@@ -70,6 +124,24 @@ export default function Sidebar({
   onFiltersChange,
 }: SidebarProps) {
   const [activeItem, setActiveItem] = useState<string | null>(null);
+  const [openFilterSection, setOpenFilterSection] = useState<FilterSection | null>(null);
+
+  const priceBadge =
+    openFilterSection !== "price" && filters.maxPrice !== null
+      ? `≤£${filters.maxPrice}`
+      : null;
+  const categoryBadge =
+    openFilterSection !== "category" && filters.categories.length > 0
+      ? String(filters.categories.length)
+      : null;
+  const communityBadge =
+    openFilterSection !== "community" && filters.buckets.length > 0
+      ? String(filters.buckets.length)
+      : null;
+
+  function toggleFilterSection(section: FilterSection) {
+    setOpenFilterSection((current) => (current === section ? null : section));
+  }
 
   return (
     <aside className="w-80 shrink-0 overflow-hidden bg-[#ffffff] px-8 py-6 font-jbmono text-[#1f271a]">
@@ -106,11 +178,11 @@ export default function Sidebar({
                   onClick={() => setActiveItem(label)}
                   className="group flex cursor-pointer items-center gap-2 whitespace-nowrap text-left text-[#1f271a]/55 transition-colors duration-200 hover:text-[#1f271a]"
                 >
-                  <span aria-hidden className="select-none text-2m leading-none">
+                  <span aria-hidden className="select-none text-base leading-none">
                     {isLast ? "└──" : "├──"}
                   </span>
                   <Icon aria-hidden className="h-5 w-5 shrink-0" strokeWidth={1.5} />
-                  <span className="text-2m flex gap-6">{label}</span>
+                  <span className="text-base flex gap-6">{label}</span>
                   {!isLast && <GappedArrowIcon aria-hidden className="h-4 w-4 shrink-0" />}
                 </button>
               );
@@ -129,88 +201,100 @@ export default function Sidebar({
 
             <div className="mt-4">
               {activeItem === "Filter" && (
-                <div className="flex flex-col gap-5 text-sm normal-case tracking-normal">
+                <div className="flex flex-col gap-4 text-sm normal-case tracking-normal">
                   <div>
-                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#1f271a]/60">
-                      <span aria-hidden className="select-none normal-case">
-                        ├──
-                      </span>
-                      Price
-                    </h3>
-                    <div className="mt-2 flex items-center gap-2 pl-5">
-                      <input
-                        type="range"
-                        min={0}
-                        max={MAX_PRICE_CAP}
-                        step={5}
-                        value={filters.maxPrice ?? MAX_PRICE_CAP}
-                        onChange={(e) => {
-                          const value = Number(e.target.value);
-                          onFiltersChange({
-                            ...filters,
-                            maxPrice: value >= MAX_PRICE_CAP ? null : value,
-                          });
-                        }}
-                        className="w-full"
-                      />
-                      <span className="whitespace-nowrap text-xs">
-                        {filters.maxPrice === null ? "Any" : `≤ £${filters.maxPrice}`}
-                      </span>
-                    </div>
+                    <FilterSectionButton
+                      label="Price"
+                      icon={PriceIcon}
+                      isLast={false}
+                      isOpen={openFilterSection === "price"}
+                      badge={priceBadge}
+                      onClick={() => toggleFilterSection("price")}
+                    />
+                    {openFilterSection === "price" && (
+                      <div className="mt-3 flex items-center gap-2 pl-9">
+                        <input
+                          type="range"
+                          min={0}
+                          max={MAX_PRICE_CAP}
+                          step={5}
+                          value={filters.maxPrice ?? MAX_PRICE_CAP}
+                          onChange={(e) => {
+                            const value = Number(e.target.value);
+                            onFiltersChange({
+                              ...filters,
+                              maxPrice: value >= MAX_PRICE_CAP ? null : value,
+                            });
+                          }}
+                          className="w-full"
+                        />
+                        <span className="whitespace-nowrap text-xs">
+                          {filters.maxPrice === null ? "Any" : `≤ £${filters.maxPrice}`}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#1f271a]/60">
-                      <span aria-hidden className="select-none normal-case">
-                        ├──
-                      </span>
-                      Category
-                    </h3>
-                    <div className="mt-2 flex flex-col gap-1.5 pl-5">
-                      {(Object.entries(CATEGORY_LABELS) as [Category, string][]).map(
-                        ([slug, catLabel]) => (
+                    <FilterSectionButton
+                      label="Category"
+                      icon={CategoryIcon}
+                      isLast={false}
+                      isOpen={openFilterSection === "category"}
+                      badge={categoryBadge}
+                      onClick={() => toggleFilterSection("category")}
+                    />
+                    {openFilterSection === "category" && (
+                      <div className="mt-3 flex flex-col gap-1.5 pl-9">
+                        {(Object.entries(CATEGORY_LABELS) as [Category, string][]).map(
+                          ([slug, catLabel]) => (
+                            <label key={slug} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={filters.categories.includes(slug)}
+                                onChange={() => {
+                                  const next = filters.categories.includes(slug)
+                                    ? filters.categories.filter((c) => c !== slug)
+                                    : [...filters.categories, slug];
+                                  onFiltersChange({ ...filters, categories: next });
+                                }}
+                              />
+                              {catLabel}
+                            </label>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <FilterSectionButton
+                      label="Community"
+                      icon={CommunityIcon}
+                      isLast={true}
+                      isOpen={openFilterSection === "community"}
+                      badge={communityBadge}
+                      onClick={() => toggleFilterSection("community")}
+                    />
+                    {openFilterSection === "community" && (
+                      <div className="mt-3 flex flex-col gap-1.5 pl-9">
+                        {COMMUNITY_BUCKET_ENTRIES.map(([slug, bucketLabel]) => (
                           <label key={slug} className="flex items-center gap-2">
                             <input
                               type="checkbox"
-                              checked={filters.categories.includes(slug)}
+                              checked={filters.buckets.includes(slug)}
                               onChange={() => {
-                                const next = filters.categories.includes(slug)
-                                  ? filters.categories.filter((c) => c !== slug)
-                                  : [...filters.categories, slug];
-                                onFiltersChange({ ...filters, categories: next });
+                                const next = filters.buckets.includes(slug)
+                                  ? filters.buckets.filter((b) => b !== slug)
+                                  : [...filters.buckets, slug];
+                                onFiltersChange({ ...filters, buckets: next });
                               }}
                             />
-                            {catLabel}
+                            {bucketLabel}
                           </label>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#1f271a]/60">
-                      <span aria-hidden className="select-none normal-case">
-                        └──
-                      </span>
-                      Community
-                    </h3>
-                    <div className="mt-2 flex flex-col gap-1.5 pl-5">
-                      {COMMUNITY_BUCKET_ENTRIES.map(([slug, bucketLabel]) => (
-                        <label key={slug} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={filters.buckets.includes(slug)}
-                            onChange={() => {
-                              const next = filters.buckets.includes(slug)
-                                ? filters.buckets.filter((b) => b !== slug)
-                                : [...filters.buckets, slug];
-                              onFiltersChange({ ...filters, buckets: next });
-                            }}
-                          />
-                          {bucketLabel}
-                        </label>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {(filters.maxPrice !== null ||
