@@ -58,4 +58,9 @@ export interface EventListItem {
     lat: number | null;
     lng: number | null;
   } | null;
+  event_buckets: {
+    confidence: number;
+    assigned_by: string;
+    buckets: { slug: string; label: string } | null;
+  }[];
 }

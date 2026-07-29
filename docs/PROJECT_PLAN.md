@@ -4,6 +4,8 @@
 
 A single map/list/card interface that aggregates the UK's events, openings and screenings from mainstream ticketing APIs *and* the independent creators who only post to their Instagram/Linktree — then tags everything against community-relevant buckets (POC, Queer, Black, Latinx, Disability-friendly, Autistic-friendly, etc.) so people can actually find the spaces built for them.
 
+**The app only ever shows events that matched at least one bucket.** Aggregation pulls in everything from a source (generic gigs, mainstream theatre, etc.), but bucket-tagging isn't a filter layered on top of a general listings feed — it's the gate. An event with zero community/accessibility signal in its own copy is discarded from what users see, not just deprioritised. This is what keeps the product "niche events for these communities," not "everything, with some of it labelled."
+
 ## 2. Why this exists
 
 Mainstream discovery apps (Eventbrite, Time Out, Google) are dominated by whoever pays for placement or has the ops capacity to list on every platform. The events that matter most to underrepresented communities are frequently:
@@ -19,7 +21,7 @@ This project treats **aggregation + inclusive categorisation** as the core produ
 1. **Coverage** — pull as much of "what's on in the UK" as possible from free/cheap APIs, refreshed on a schedule.
 2. **Long tail** — surface independent creator events that never touch a ticketing platform, via link-in-bio scraping.
 3. **Normalisation** — merge wildly different source schemas into one clean `Event` model, dedupe cross-posted events.
-4. **Inclusive categorisation** — an AI classification layer that tags events into identity/accessibility buckets, with Blackness as a primary lens, not a checkbox.
+4. **Inclusive categorisation** — a classification layer that tags events into identity/accessibility buckets, with Blackness as a primary lens, not a checkbox. Bucket-tagging is a gate, not a filter: only bucket-matched events are ever surfaced to users.
 5. **Multi-modal discovery** — list, card grid, and map/pin views of the same underlying data.
 6. **Personalisation** — accounts, saved locations, favourites, ratings, proximity/interest-based notifications.
 
@@ -154,8 +156,11 @@ Dedup strategy: fuzzy-match on (title similarity + venue + date window) across s
 
 **Goal**: not just "is this a gig" but *who is this for, and is it accessible to them*.
 
-- Run as a **batch enrichment step** after normalisation, not live per page-load — cheaper, cacheable, and lets you review/correct output before it's public.
-- Use structured output (tool-call / JSON schema) so buckets are a controlled vocabulary, not free text: `["black", "poc", "queer", "latinx", "disability-friendly", "autistic-friendly", "womxn-led", "free-entry", ...]` — extendable, but keep it a maintained list rather than letting the model invent new tags per event.
+**Bucket-tagging is a gate, not a filter.** Events with zero matched buckets are discarded from every user-facing view (list/card/map) — the app deliberately does not show "everything, with some of it labelled." The raw aggregated feed (everything from every source) only exists internally, as input to this classification step.
+
+- **v1 implementation is a free, from-scratch keyword/phrase classifier** (`lib/buckets.ts`), not an LLM — deterministic, zero ongoing cost, and re-runnable anytime. It only matches explicit phrases actually present in an event's own title/description (never infers from an organiser's name), which happens to satisfy the bias safeguard below by construction. A real LLM-based pass (see below) remains a valid future upgrade for nuance the keyword approach can't catch — if added, it should be clearly distinguished from keyword matches (e.g. a distinct `assigned_by` value) so users and moderators can tell which method produced a given tag.
+- Longer-term/LLM version: run as a **batch enrichment step** after normalisation, not live per page-load — cheaper, cacheable, and lets you review/correct output before it's public.
+- Use structured output (tool-call / JSON schema) so buckets are a controlled vocabulary, not free text: `["black", "poc", "queer", "latinx", "east-mon-asian", "south-asian", "disability-friendly", "autistic-friendly", "deaf-accessible", "womxn-led", "sober-friendly", "grassroots-activism", "low-income-access", "free-entry", ...]` — extendable, but keep it a maintained list rather than letting the model invent new tags per event.
 - Each bucket assignment carries a **confidence score** and the **evidence snippet** the model used, so low-confidence tags can be queued for human review instead of silently mis-tagging an event.
 - **Bias/accuracy safeguard**: because these are identity categories tied to real communities, treat this as the highest-scrutiny part of the pipeline:
   - Never infer identity from an organiser's name/photo alone — require explicit signal in event copy (e.g. "Black queer social", "wheelchair accessible venue, step-free").

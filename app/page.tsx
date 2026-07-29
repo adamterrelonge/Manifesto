@@ -1,6 +1,8 @@
 import AppShell from "@/app/components/AppShell";
 import { createPublicClient } from "@/lib/supabase/server";
 import type { EventListItem } from "@/lib/types";
+import { NON_QUALIFYING_BUCKETS, HIGH_CONFIDENCE_THRESHOLD, type BucketSlug } from "@/lib/buckets";
+import { QUALITY_THRESHOLD } from "@/lib/quality";
 
 // Live DB query — don't let this get prerendered/frozen at build time.
 export const dynamic = "force-dynamic";
@@ -17,18 +19,36 @@ export default async function Home() {
   const horizon = new Date(now);
   horizon.setDate(horizon.getDate() + 8);
 
-  const { data: events, error } = await supabase
+  // event_buckets!inner is a first-pass gate: it excludes events with zero
+  // bucket matches at all. The JS filter below is the real "niche events
+  // only" gate — an event needs at least one bucket match that is (a) not
+  // in NON_QUALIFYING_BUCKETS (free-entry/low-income-access describe cost,
+  // not identity), and (b) either high-confidence or moderator-approved.
+  // A low-confidence keyword guess alone never makes an event public —
+  // it sits in the admin review queue until a moderator approves it or a
+  // stronger match arrives. See docs/PROJECT_PLAN.md §9.
+  const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, description, start_at, category, is_free, price_min, currency, source_url, image_url, venues(name, city, region, lat, lng)"
+      "id, title, description, start_at, category, is_free, price_min, currency, source_url, image_url, venues(name, city, region, lat, lng), event_buckets!inner(confidence, assigned_by, buckets(slug, label))"
     )
     .eq("status", "published")
     .eq("is_duplicate", false)
+    .gte("quality_score", QUALITY_THRESHOLD) // also excludes unscored (null) rows
     .gte("start_at", now.toISOString())
     .lt("start_at", horizon.toISOString())
     .order("start_at", { ascending: true })
-    .limit(500)
+    .limit(1000)
     .returns<EventListItem[]>();
 
-  return <AppShell events={events ?? []} error={error?.message ?? null} />;
+  const events = (data ?? []).filter((event) =>
+    event.event_buckets.some(
+      (eb) =>
+        eb.buckets &&
+        !NON_QUALIFYING_BUCKETS.includes(eb.buckets.slug as BucketSlug) &&
+        (eb.confidence >= HIGH_CONFIDENCE_THRESHOLD || eb.assigned_by === "moderator")
+    )
+  );
+
+  return <AppShell events={events} error={error?.message ?? null} />;
 }

@@ -13,13 +13,28 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: matched, error } = await admin.rpc("run_event_dedup");
-  if (error) {
+  // Venues first: merging split venue rows (e.g. "11 Water Street" vs
+  // "11 Water St") makes event dedup more effective too, since it only
+  // matches events sharing the same venue_id.
+  const { data: venuesMerged, error: venueError } = await admin.rpc(
+    "merge_duplicate_venues"
+  );
+  if (venueError) {
     return NextResponse.json(
-      { error: `Dedup pass failed: ${error.message}` },
+      { error: `Venue merge failed: ${venueError.message}` },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ matched });
+  const { data: eventsMatched, error: eventError } = await admin.rpc(
+    "run_event_dedup"
+  );
+  if (eventError) {
+    return NextResponse.json(
+      { error: `Event dedup pass failed: ${eventError.message}` },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ venuesMerged, eventsMatched });
 }
