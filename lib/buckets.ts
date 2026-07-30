@@ -36,14 +36,41 @@ type KeywordBucketSlug = Exclude<BucketSlug, "free-entry">;
 
 const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
   black: [
-    { phrase: "black-owned", confidence: 0.95 },
+    { phrase: "black women", confidence: 0.95 },
+    { phrase: "black woman", confidence: 0.95 },
+    { phrase: "black people", confidence: 0.95 },
+    { phrase: "black person", confidence: 0.95 },
+    { phrase: "black men", confidence: 0.95 },
+    { phrase: "black man", confidence: 0.95 },
     { phrase: "black owned", confidence: 0.95 },
+    { phrase: "black-owned", confidence: 0.95 },
     { phrase: "black-led", confidence: 0.95 },
     { phrase: "black led", confidence: 0.95 },
     { phrase: "black queer", confidence: 0.95 },
     { phrase: "black trans", confidence: 0.95 },
+    { phrase: "black community", confidence: 0.9 },
+    { phrase: "black creatives", confidence: 0.9 },
+    { phrase: "black founders", confidence: 0.9 },
+    { phrase: "black-focused", confidence: 0.9 },
+
+    // UK-specific & Diaspora phrasing
+    { phrase: "black british", confidence: 0.85 },
+    { phrase: "afro-caribbean", confidence: 0.85 },
+    { phrase: "afro caribbean", confidence: 0.85 },
+    { phrase: "afrocaribbean", confidence: 0.85 },
+    { phrase: "african and caribbean", confidence: 0.85 },
+    { phrase: "african-caribbean", confidence: 0.85 },
+    { phrase: "african diaspora", confidence: 0.85 },
+    { phrase: "caribbean diaspora", confidence: 0.85 },
+    { phrase: "black heritage", confidence: 0.85 },
+
+    // Cultural expressions & Event themes
     { phrase: "black joy", confidence: 0.85 },
     { phrase: "black excellence", confidence: 0.85 },
+    { phrase: "black history month", confidence: 0.85 },
+    { phrase: "bhm", confidence: 0.8 },
+    { phrase: "melanin", confidence: 0.75 },
+    { phrase: "black owned business", confidence: 0.95 },
     { phrase: "afro-caribbean", confidence: 0.8 },
     { phrase: "afrocaribbean", confidence: 0.8 },
     { phrase: "black history month", confidence: 0.85 },
@@ -54,14 +81,25 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
   poc: [
     { phrase: "people of colour", confidence: 0.95 },
     { phrase: "people of color", confidence: 0.95 },
-    { phrase: "bipoc", confidence: 0.9 },
-    { phrase: "qtipoc", confidence: 0.95 }, // Queer Trans Intersex People of Colour
+    { phrase: "bpoc", confidence: 0.95 },
+    { phrase: "bipoc", confidence: 0.95 },
+    { phrase: "qtipoc", confidence: 0.95 },
+    { phrase: "qtibpoc", confidence: 0.95 }, // Explicit Trans/Intersex addition
     { phrase: "qtoc", confidence: 0.9 },
     { phrase: "poc-led", confidence: 0.95 },
     { phrase: "poc led", confidence: 0.95 },
     { phrase: "poc-owned", confidence: 0.95 },
+    { phrase: "poc owned", confidence: 0.95 },
+
+    // UK Collective Terminology
     { phrase: "global majority", confidence: 0.85 },
     { phrase: "people of the global majority", confidence: 0.9 },
+    { phrase: "person of the global majority", confidence: 0.9 },
+    { phrase: "black and brown", confidence: 0.85 },
+    { phrase: "black & brown", confidence: 0.85 },
+    { phrase: "bame", confidence: 0.75 }, // Common UK institutional acronym
+    { phrase: "poc community", confidence: 0.85 },
+    { phrase: "poc-friendly", confidence: 0.8 },
   ],
   queer: [
     { phrase: "lgbtq+", confidence: 0.95 },
@@ -85,13 +123,33 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
   ],
   latinx: [
     { phrase: "latinx", confidence: 0.95 },
-    { phrase: "latine", confidence: 0.9 },
+    { phrase: "latine", confidence: 0.95 },
+    { phrase: "latinx-led", confidence: 0.95 },
+    { phrase: "latinx led", confidence: 0.95 },
+    { phrase: "latine-led", confidence: 0.95 },
     { phrase: "latin-owned", confidence: 0.9 },
-    { phrase: "latinx-led", confidence: 0.9 },
-    { phrase: "latin-american", confidence: 0.7 },
-    { phrase: "hispanic", confidence: 0.6 },
-    { phrase: "latina", confidence: 0.55 },
-    { phrase: "latino", confidence: 0.55 },
+    { phrase: "latin owned", confidence: 0.9 },
+    { phrase: "latina-owned", confidence: 0.9 },
+    { phrase: "latina owned", confidence: 0.9 },
+
+    // Regional & Community Phrases
+    { phrase: "latin american", confidence: 0.85 },
+    { phrase: "latin america", confidence: 0.8 },
+    { phrase: "latin community", confidence: 0.85 },
+    { phrase: "latinx community", confidence: 0.9 },
+    { phrase: "latin creatives", confidence: 0.85 },
+    { phrase: "latina", confidence: 0.75 },
+    { phrase: "latinas", confidence: 0.75 },
+    { phrase: "latino", confidence: 0.7 },
+    { phrase: "latinos", confidence: 0.7 },
+    { phrase: "hispanic", confidence: 0.7 },
+    { phrase: "afro-latina", confidence: 0.9 },
+    { phrase: "afro-latino", confidence: 0.9 },
+    { phrase: "afro-latinx", confidence: 0.95 },
+    { phrase: "afrolatinx", confidence: 0.95 },
+    { phrase: "afrolatina", confidence: 0.9 },
+    { phrase: "queer latinx", confidence: 0.95 },
+    { phrase: "queer latina", confidence: 0.95 },
   ],
   "east-mon-asian": [
     { phrase: "esea", confidence: 0.9 }, // East and Southeast Asian

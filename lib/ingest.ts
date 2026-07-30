@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { NormalisedEvent, NormalisedVenue } from "@/lib/types";
+import type { NormalisedEvent, NormalisedOrganiser, NormalisedVenue } from "@/lib/types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -41,11 +41,44 @@ async function upsertVenue(
   return inserted.id;
 }
 
+async function upsertOrganiser(
+  admin: AdminClient,
+  organiser: NormalisedOrganiser
+): Promise<string | null> {
+  // Curated sources (e.g. Eventbrite) reuse the same organiser on every
+  // event, so an exact match on source_type + profile_url is enough —
+  // no fuzzy matching like upsertVenue needs.
+  const { data: existing, error: selectError } = await admin
+    .from("organisers")
+    .select("id")
+    .eq("source_type", organiser.sourceType)
+    .eq("profile_url", organiser.profileUrl)
+    .maybeSingle();
+  if (selectError) throw selectError;
+  if (existing) return existing.id;
+
+  const { data: inserted, error: insertError } = await admin
+    .from("organisers")
+    .insert({
+      name: organiser.name,
+      source_type: organiser.sourceType,
+      profile_url: organiser.profileUrl,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) throw insertError;
+  return inserted.id;
+}
+
 export async function upsertNormalisedEvent(
   admin: AdminClient,
   event: NormalisedEvent
 ): Promise<void> {
   const venueId = event.venue ? await upsertVenue(admin, event.venue) : null;
+  const organiserId = event.organiser
+    ? await upsertOrganiser(admin, event.organiser)
+    : null;
 
   const { error } = await admin.from("events").upsert(
     {
@@ -54,6 +87,7 @@ export async function upsertNormalisedEvent(
       start_at: event.startAt,
       end_at: event.endAt,
       venue_id: venueId,
+      organiser_id: organiserId,
       category: event.category,
       is_free: event.isFree,
       price_min: event.priceMin,

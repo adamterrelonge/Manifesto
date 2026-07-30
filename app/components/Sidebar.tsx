@@ -124,7 +124,18 @@ export default function Sidebar({
   onFiltersChange,
 }: SidebarProps) {
   const [activeItem, setActiveItem] = useState<string | null>(null);
+  // Drives which detail content is rendered — deliberately NOT cleared when
+  // the user presses Back. activeItem going null still slides the detail
+  // panel back out of view, but its last content stays mounted throughout
+  // that slide instead of vanishing instantly, so it reads as the panel
+  // sliding away rather than the options disappearing.
+  const [displayedItem, setDisplayedItem] = useState<string | null>(null);
   const [openFilterSection, setOpenFilterSection] = useState<FilterSection | null>(null);
+
+  function openItem(label: string) {
+    setActiveItem(label);
+    setDisplayedItem(label);
+  }
 
   const priceBadge =
     openFilterSection !== "price" && filters.maxPrice !== null
@@ -175,7 +186,7 @@ export default function Sidebar({
                 <button
                   key={label}
                   type="button"
-                  onClick={() => setActiveItem(label)}
+                  onClick={() => openItem(label)}
                   className="group flex cursor-pointer items-center gap-2 whitespace-nowrap text-left text-[#1f271a]/55 transition-colors duration-200 hover:text-[#1f271a]"
                 >
                   <span aria-hidden className="select-none text-base leading-none">
@@ -200,7 +211,7 @@ export default function Sidebar({
             </button>
 
             <div className="mt-4">
-              {activeItem === "Filter" && (
+              {displayedItem === "Filter" && (
                 <div className="flex flex-col gap-4 text-sm normal-case tracking-normal">
                   <div>
                     <FilterSectionButton
@@ -311,7 +322,7 @@ export default function Sidebar({
                 </div>
               )}
 
-              {activeItem && activeItem !== "Filter" && (
+              {displayedItem && displayedItem !== "Filter" && (
                 <p className="text-sm normal-case tracking-normal text-[#1f271a]/60">
                   Coming soon.
                 </p>

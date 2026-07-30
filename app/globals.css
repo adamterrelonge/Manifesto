@@ -29,70 +29,211 @@ body {
 /* Sidebar icon hover animations — see app/components/icons.tsx */
 
 @keyframes sidebar-filter-sift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(2.5px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(2.5px);
+  }
 }
 
 @keyframes sidebar-conn-left {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(-2.5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(-2.5px);
+  }
 }
 
 @keyframes sidebar-conn-right {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(2.5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(2.5px);
+  }
 }
 
 @keyframes sidebar-heart-beat {
-  0%, 100% { transform: scale(1); }
-  30% { transform: scale(1.22); }
-  55% { transform: scale(0.92); }
-  75% { transform: scale(1.08); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  30% {
+    transform: scale(1.22);
+  }
+
+  55% {
+    transform: scale(0.92);
+  }
+
+  75% {
+    transform: scale(1.08);
+  }
 }
 
 @keyframes sidebar-bell-jiggle {
-  0%, 100% { transform: rotate(0deg); }
-  15% { transform: rotate(-16deg); }
-  35% { transform: rotate(13deg); }
-  55% { transform: rotate(-9deg); }
-  75% { transform: rotate(4deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  15% {
+    transform: rotate(-16deg);
+  }
+
+  35% {
+    transform: rotate(13deg);
+  }
+
+  55% {
+    transform: rotate(-9deg);
+  }
+
+  75% {
+    transform: rotate(4deg);
+  }
 }
 
 @keyframes sidebar-gear-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(180deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(180deg);
+  }
 }
 
 @keyframes sidebar-dice-roll {
-  0%, 100% { transform: rotate(0deg) translateY(0); }
-  30% { transform: rotate(-14deg) translateY(-1.5px); }
-  60% { transform: rotate(11deg) translateY(0); }
-  85% { transform: rotate(-4deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  30% {
+    transform: rotate(-14deg) translateY(-1.5px);
+  }
+
+  60% {
+    transform: rotate(11deg) translateY(0);
+  }
+
+  85% {
+    transform: rotate(-4deg);
+  }
 }
 
 @keyframes sidebar-tag-swing {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-9deg); }
-  60% { transform: rotate(7deg); }
-  85% { transform: rotate(-3deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(-9deg);
+  }
+
+  60% {
+    transform: rotate(7deg);
+  }
+
+  85% {
+    transform: rotate(-3deg);
+  }
 }
 
 @keyframes sidebar-grid-pop {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.18);
+  }
 }
 
 @keyframes sidebar-arrow-top {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-1.5px, -2px); }
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(-1.5px, 0);
+  }
 }
 
 @keyframes sidebar-arrow-side {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(2px, 1.5px); }
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(0, 1.5px);
+  }
 }
 
 @keyframes sidebar-arrow-shaft {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-2px, 2px); }
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(-2px, 2px);
+  }
+}
+
+@keyframes globe-spin-3d {
+  0% {
+    /* Merdians aligned at center-left */
+    transform: scaleX(1) translateX(0px);
+  }
+
+  50% {
+    /* Flatten meridians toward center to simulate depth rotation */
+    transform: scaleX(0.2) translateX(0px);
+  }
+
+  100% {
+    /* Expand back out as the opposite face rotates into view */
+    transform: scaleX(1) translateX(0px);
+  }
+}
+
+.animate-globe-3d {
+  transform-origin: center;
+  animation: globe-spin-3d 0.8s ease-in-out;
+}
+
+@keyframes globe-meridian-slide {
+  0% {
+    transform: translateX(-7px);
+  }
+
+  100% {
+    transform: translateX(0px);
+  }
 }
