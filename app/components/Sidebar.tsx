@@ -16,6 +16,7 @@ import {
 } from "@/app/components/icons";
 import { CATEGORY_LABELS, type Category } from "@/lib/categories";
 import { BUCKET_LABELS, NON_QUALIFYING_BUCKETS, type BucketSlug } from "@/lib/buckets";
+import type { DateFilter } from "@/lib/date-filter";
 
 interface SidebarItem {
   label: string;
@@ -30,8 +31,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { label: "Settings", icon: SettingsIcon },
   { label: "Shuffle", icon: ShuffleIcon },
 ];
-
-export type DateFilter = "today" | "tomorrow" | "week";
 
 const DATE_FILTERS: { value: DateFilter; label: string }[] = [
   { value: "today", label: "Today" },
@@ -226,6 +225,7 @@ export default function Sidebar({
                       <div className="mt-3 flex items-center gap-2 pl-9">
                         <input
                           type="range"
+                          aria-label="Maximum price"
                           min={0}
                           max={MAX_PRICE_CAP}
                           step={5}

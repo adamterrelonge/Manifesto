@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NON_QUALIFYING_BUCKETS } from "@/lib/buckets";
+import { isValidBearerSecret } from "@/lib/auth";
 
 // Reads/writes event_buckets directly — never prerender/cache.
 export const dynamic = "force-dynamic";
 
+// Deliberately its own secret (ADMIN_SECRET), not INGEST_SECRET — this one
+// gets typed into the browser and kept in sessionStorage by the admin UI,
+// so it has a much larger exposure surface than a server-to-server ingest
+// trigger. Keeping them separate means a leak here can't also be used to
+// trigger ingestion or rescoring, and vice versa.
 function checkAuth(request: NextRequest) {
-  const secret = process.env.INGEST_SECRET;
-  const authHeader = request.headers.get("authorization");
-  return Boolean(secret) && authHeader === `Bearer ${secret}`;
+  return isValidBearerSecret(request.headers.get("authorization"), process.env.ADMIN_SECRET);
 }
 
 export async function GET(request: NextRequest) {

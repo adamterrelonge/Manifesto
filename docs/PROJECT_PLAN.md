@@ -24,6 +24,8 @@ This project treats **aggregation + inclusive categorisation** as the core produ
 4. **Inclusive categorisation** — a classification layer that tags events into identity/accessibility buckets, with Blackness as a primary lens, not a checkbox. Bucket-tagging is a gate, not a filter: only bucket-matched events are ever surfaced to users.
 5. **Multi-modal discovery** — list, card grid, and map/pin views of the same underlying data.
 6. **Personalisation** — accounts, saved locations, favourites, ratings, proximity/interest-based notifications.
+7. **Source breadth** — grow past a handful of API-friendly sources into a wide, ongoing pool of venues and institutions (galleries, museums, community spaces, ticketing platforms) via adapters and scrapers, so coverage isn't capped by how many integrations happen to exist yet.
+8. **Operational robustness at scale** — every pipeline stage (classification, quality scoring, dedup) must correctly process the *entire* events table as it grows into the thousands of rows, not silently truncate against an unpaginated query's default row cap; the schema also needs a real retention/expiry story for events whose run has ended, rather than unbounded row growth.
 
 ## 4. Non-goals (for now)
 
@@ -202,16 +204,22 @@ Dedup strategy: fuzzy-match on (title similarity + venue + date window) across s
 - Admin review queue for tag correction.
 - Spam/quality filtering.
 
-**Phase 3 — Long tail**
+**Phase 3 — Pipeline hardening & source expansion**
+- Audit every batch pipeline stage (classify, quality, dedup) for the same unpaginated-query row cap already found and fixed in classify/quality — dedup hasn't been checked yet, and any future stage needs to page through `.range()` from day one rather than trusting a single `.select()`.
+- Add a retention/expiry strategy for events whose run has ended (`end_at`, or `start_at` if there's no `end_at`, in the past) so the live/published set doesn't grow unbounded — archive or exclude rather than leaving every past event live forever.
+- Add DB indexes on the columns every pipeline stage and the homepage query filter/order by (`status`, `is_duplicate`, `quality_score`, `start_at`, `end_at`) — query cost only gets worse as row count grows.
+- Keep adding source adapters beyond the current handful (§6), prioritising venues/institutions already scoped as scrapable (e.g. the Barbican pattern), to grow real coverage rather than just fixing the pipe the existing sources flow through.
+
+**Phase 4 — Long tail**
 - Curated creator seed list + link-in-bio scraper.
 - Organiser claim/edit flow.
 - Manual community submission form.
 
-**Phase 4 — Accounts & personalisation**
+**Phase 5 — Accounts & personalisation**
 - Auth, saved location, favourites, ratings.
 - Notification preferences + delivery (web push → email → mobile later).
 
-**Phase 5 — Polish & scale**
+**Phase 6 — Polish & scale**
 - Performance pass on map rendering at scale (clustering, tile-based loading).
 - City/region pages for SEO (London boroughs, Manchester wards, Glasgow districts, etc.).
 - Analytics on which buckets/areas get the most engagement, to prioritise scraper coverage.

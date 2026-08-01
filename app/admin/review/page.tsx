@@ -102,11 +102,15 @@ export default function AdminReviewPage() {
           }}
           className="flex flex-col gap-2"
         >
+          <label htmlFor="admin-secret" className="text-sm text-zinc-600 dark:text-zinc-400">
+            Admin secret
+          </label>
           <input
+            id="admin-secret"
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            placeholder="INGEST_SECRET"
+            placeholder="ADMIN_SECRET"
             className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
           <button

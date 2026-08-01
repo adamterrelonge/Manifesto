@@ -38,7 +38,7 @@ export default function EventsListView({ events, error }: EventsListViewProps) {
       )}
 
       {events.length > 0 && (
-        <ul className="divide-y divide-black/5 overflow-hidden rounded-2xl bg-white/80 shadow-sm ring-1 ring-black/5 backdrop-blur-sm dark:divide-white/10 dark:bg-zinc-900/60 dark:ring-white/10">
+        <ul className="flex flex-col gap-3">
           {events.map((event) => {
             const price = formatEventPrice(event);
             const chips = [categoryLabel(event.category), ...bucketChips(event)].filter(
@@ -102,7 +102,7 @@ export default function EventsListView({ events, error }: EventsListViewProps) {
             );
 
             const rowClassName =
-              "group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] sm:px-5";
+              "group flex items-center gap-4 rounded-2xl bg-white/80 px-4 py-3 ring-black/5 backdrop-blur-sm transition-colors hover:bg-black/[0.03] dark:bg-zinc-900/60 dark:ring-white/10 dark:hover:bg-white/[0.04] sm:px-5";
 
             return (
               <li key={event.id}>

@@ -45,6 +45,7 @@ export interface EventListItem {
   title: string;
   description: string | null;
   start_at: string;
+  end_at: string | null;
   category: string | null;
   is_free: boolean;
   price_min: number | null;

@@ -14,6 +14,12 @@ const BASE_PROPS = {
   strokeWidth: 1.75,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
+  // Every one of these is purely decorative (paired with visible text or
+  // redundant with a link/button's own accessible name) — defaulting to
+  // hidden here means a call site has to opt back in, not remember to opt
+  // out, which is the mistake that left GappedArrowIcon unhidden in
+  // EventsListView.tsx while every other usage set it explicitly.
+  "aria-hidden": true,
 };
 
 const FILL_BOX_CENTER = { transformBox: "fill-box", transformOrigin: "center" } as const;

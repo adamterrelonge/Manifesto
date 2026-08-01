@@ -1,6 +1,6 @@
 // Lightweight, deterministic spam/quality scoring — no external calls.
 // Catches obviously-broken or junk listings before they reach users.
-// Matters more once Phase 3's bio-link scraper and manual submissions
+// Matters more once Phase 4's bio-link scraper and manual submissions
 // bring in untrusted free-text content; today's structured APIs (Skiddle,
 // Ticketmaster) are low-risk, but this establishes the gate ahead of that.
 

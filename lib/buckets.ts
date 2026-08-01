@@ -36,6 +36,10 @@ type KeywordBucketSlug = Exclude<BucketSlug, "free-entry">;
 
 const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
   black: [
+    { phrase: "pan-african", confidence: 0.95 },
+    { phrase: "pan african", confidence: 0.95 },
+    { phrase: "panafrica", confidence: 0.95 },
+    { phrase: "pan-africanism", confidence: 0.95 },
     { phrase: "black women", confidence: 0.95 },
     { phrase: "black woman", confidence: 0.95 },
     { phrase: "black people", confidence: 0.95 },
@@ -77,6 +81,13 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "black british", confidence: 0.65 },
     { phrase: "afrobeats", confidence: 0.4 }, // Low: often just a club night genre
     { phrase: "amapiano", confidence: 0.4 },
+
+    // Institutional "designated audience" session framing — museums/theatres
+    // commonly title a specific screening/tour this way (e.g. "Black
+    // audience viewings: [exhibition]"), distinct from describing the
+    // event's own subject matter.
+    { phrase: "black audience", confidence: 0.9 },
+    { phrase: "black audiences", confidence: 0.9 },
   ],
   poc: [
     { phrase: "people of colour", confidence: 0.95 },
@@ -100,6 +111,8 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "bame", confidence: 0.75 }, // Common UK institutional acronym
     { phrase: "poc community", confidence: 0.85 },
     { phrase: "poc-friendly", confidence: 0.8 },
+    { phrase: "poc audience", confidence: 0.85 },
+    { phrase: "poc audiences", confidence: 0.85 },
   ],
   queer: [
     { phrase: "lgbtq+", confidence: 0.95 },
@@ -120,6 +133,8 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "drag king", confidence: 0.85 },
     { phrase: "drag queen", confidence: 0.8 },
     { phrase: "pride", confidence: 0.5 }, // Low: high corporate co-optation
+    { phrase: "queer audience", confidence: 0.85 },
+    { phrase: "queer audiences", confidence: 0.85 },
   ],
   latinx: [
     { phrase: "latinx", confidence: 0.95 },
@@ -150,6 +165,8 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "afrolatina", confidence: 0.9 },
     { phrase: "queer latinx", confidence: 0.95 },
     { phrase: "queer latina", confidence: 0.95 },
+    { phrase: "latinx audience", confidence: 0.9 },
+    { phrase: "latinx audiences", confidence: 0.9 },
   ],
   "east-mon-asian": [
     { phrase: "esea", confidence: 0.9 }, // East and Southeast Asian
