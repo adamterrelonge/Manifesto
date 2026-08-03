@@ -18,6 +18,21 @@ import {
   fetchTicketmasterEvents,
   normaliseTicketmasterEvent,
 } from "@/lib/sources/ticketmaster";
+import { fetchAutographEvents, normaliseAutographEvent } from "@/lib/sources/autograph";
+import { fetchQueerBritainEvents, normaliseQueerBritainEvent } from "@/lib/sources/queer-britain";
+import { fetchTateEvents, normaliseTateEvent } from "@/lib/sources/tate";
+import { fetchHornimanEvents, normaliseHornimanEvent } from "@/lib/sources/horniman";
+import { fetchIcaEvents, normaliseIcaEvent } from "@/lib/sources/ica";
+import { fetchWhitechapelEvents, normaliseWhitechapelEvent } from "@/lib/sources/whitechapel";
+import {
+  fetchSouthLondonGalleryEvents,
+  normaliseSouthLondonGalleryEvent,
+} from "@/lib/sources/south-london-gallery";
+import {
+  fetchMigrationMuseumEvents,
+  normaliseMigrationMuseumEvent,
+} from "@/lib/sources/migration-museum";
+import { fetchVamEastEvents, normaliseVamEastEvent } from "@/lib/sources/vam-east";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -159,6 +174,141 @@ async function ingestTicketmaster(admin: AdminClient): Promise<SourceResult> {
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestAutograph(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchAutographEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseAutographEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestQueerBritain(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchQueerBritainEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseQueerBritainEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestTate(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchTateEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseTateEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestHorniman(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchHornimanEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseHornimanEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestIca(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchIcaEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseIcaEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestWhitechapel(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchWhitechapelEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseWhitechapelEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestSouthLondonGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchSouthLondonGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseSouthLondonGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestMigrationMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchMigrationMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseMigrationMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestVamEast(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchVamEastEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseVamEastEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -177,12 +327,36 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const [barbican, eventbrite, serpentine, skiddle, ticketmaster] = await Promise.all([
+  const [
+    barbican,
+    eventbrite,
+    serpentine,
+    skiddle,
+    ticketmaster,
+    autograph,
+    queerBritain,
+    tate,
+    horniman,
+    ica,
+    whitechapel,
+    southLondonGallery,
+    migrationMuseum,
+  vamEast,
+  ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
     runSource("serpentine", () => ingestSerpentine(admin)),
     runSource("skiddle", () => ingestSkiddle(admin)),
     runSource("ticketmaster", () => ingestTicketmaster(admin)),
+    runSource("autograph", () => ingestAutograph(admin)),
+    runSource("queer-britain", () => ingestQueerBritain(admin)),
+    runSource("tate", () => ingestTate(admin)),
+    runSource("horniman", () => ingestHorniman(admin)),
+    runSource("ica", () => ingestIca(admin)),
+    runSource("whitechapel", () => ingestWhitechapel(admin)),
+    runSource("south-london-gallery", () => ingestSouthLondonGallery(admin)),
+    runSource("migration-museum", () => ingestMigrationMuseum(admin)),
+    runSource("vam-east", () => ingestVamEast(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -219,7 +393,22 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    sources: { barbican, eventbrite, serpentine, skiddle, ticketmaster },
+    sources: {
+      barbican,
+      eventbrite,
+      serpentine,
+      skiddle,
+      ticketmaster,
+      autograph,
+      queerBritain,
+      tate,
+      horniman,
+      ica,
+      whitechapel,
+      southLondonGallery,
+      migrationMuseum,
+      vamEast,
+    },
     expiry,
     dedup,
     classify,

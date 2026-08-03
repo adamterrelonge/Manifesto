@@ -22,6 +22,8 @@ export const EVENTBRITE_ORGANISERS: EventbriteOrganiser[] = [
   { id: "37469169963", name: "Skate Gals & Pals CIC & Melanin Skate Gals & Pals" },
   { id: "32367103763", name: "Black Minds Matter" },
   { id: "29636506451", name: "Black Girls Hike CIC" },
+  { id: "26461743593", name: "Black Culture Market" },
+  { id: "68181723383", name: "Black Pub Quiz" },
   { id: "11899923421", name: "BYP Network" },
   { id: "43436027623", name: "Dope Black Queers" },
   { id: "21020223735", name: "Coding Black Females" },

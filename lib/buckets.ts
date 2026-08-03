@@ -88,6 +88,19 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     // event's own subject matter.
     { phrase: "black audience", confidence: 0.9 },
     { phrase: "black audiences", confidence: 0.9 },
+
+    // Cultural subject matter — exhibitions/films/talks about Black
+    // history, music or culture where the word "Black" describes the
+    // topic, not the intended audience. Added because exhibition titles
+    // like "The Music is Black: A British Story" won't contain compound
+    // phrases like "black british" but their descriptions reliably will.
+    { phrase: "black music", confidence: 0.9 },
+    { phrase: "black culture", confidence: 0.85 },
+    { phrase: "black arts", confidence: 0.85 },
+    { phrase: "black art", confidence: 0.75 },
+    { phrase: "black history", confidence: 0.8 },
+    { phrase: "black experience", confidence: 0.85 },
+    { phrase: "black stories", confidence: 0.85 },
   ],
   poc: [
     { phrase: "people of colour", confidence: 0.95 },
