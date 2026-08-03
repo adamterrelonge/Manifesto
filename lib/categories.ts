@@ -36,3 +36,94 @@ export function categoryLabel(category: string | null | undefined): string | nul
   if (CATEGORY_SET.has(category)) return CATEGORY_LABELS[category as Category];
   return category;
 }
+
+// ---------------------------------------------------------------------------
+// Keyword-based category inference
+// Checked in priority order — first match wins. Phrases are matched
+// case-insensitively against the concatenated title + description.
+// ---------------------------------------------------------------------------
+
+const INFERENCE_RULES: Array<{ category: Category; phrases: string[] }> = [
+  {
+    category: "film",
+    phrases: [
+      "film screening", "film programme", "film program", "film club",
+      "cinema screening", "screening of", "documentary screening",
+      "moving image", "video art", "short films", "feature film",
+    ],
+  },
+  {
+    category: "music",
+    phrases: [
+      "live music", "live concert", "concert", "gig", "jazz",
+      "classical music", "choir", "orchestra", "recital",
+      "dj set", "dj night", "band night", "music festival",
+      "open mic", "open-mic",
+    ],
+  },
+  {
+    category: "theatre-performance",
+    phrases: [
+      "theatre", "theater", "dance performance", "ballet", "opera",
+      "live performance", "spoken word", "cabaret", "circus",
+      "live art", "performance art", "choreography", "dance piece",
+      "physical theatre", "drag performance", "drag show",
+    ],
+  },
+  {
+    category: "workshop-talk",
+    phrases: [
+      "workshop", "masterclass", "artist talk", "in conversation with",
+      "panel discussion", "panel talk", "q&a", "symposium", "seminar",
+      "lecture", "guided tour", "study day", "open call",
+      "life drawing", "drawing class", "art class", "craft class",
+      "writing workshop", "poetry workshop", "community workshop",
+    ],
+  },
+  {
+    category: "market-fair",
+    phrases: [
+      "art fair", "craft fair", "makers market", "makers fair",
+      "book fair", "pop-up market", "flea market", "bazaar",
+      "open market",
+    ],
+  },
+  {
+    category: "family-kids",
+    phrases: [
+      "family workshop", "for families", "for children", "for kids",
+      "family activity", "children's", "family event", "kids workshop",
+      "under 12", "under 16", "toddler", "young people", "youth club",
+      "school holiday", "half term",
+    ],
+  },
+  {
+    category: "community-social",
+    phrases: [
+      "community event", "community gathering", "open day",
+      "networking", "social event", "drop-in", "drop in",
+      "celebration", "gathering", "meetup", "meet-up",
+    ],
+  },
+  {
+    category: "gallery-exhibition",
+    phrases: [
+      "exhibition", "exhibiting", "exhibits", "retrospective",
+      "installation", "on show", "on view", "private view",
+      "vernissage", "open studios", "open studio", "solo show",
+      "group show", "artist residency", "new works", "new work by",
+      "paintings", "sculptures", "photographs by", "drawings by",
+    ],
+  },
+];
+
+export function inferCategory(
+  title: string,
+  description: string | null
+): Category | null {
+  const haystack = `${title} ${description ?? ""}`.toLowerCase();
+  for (const { category, phrases } of INFERENCE_RULES) {
+    if (phrases.some((p) => haystack.includes(p))) return category;
+  }
+  return null;
+}

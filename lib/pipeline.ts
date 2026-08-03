@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyEventBuckets } from "@/lib/buckets";
+import { inferCategory } from "@/lib/categories";
 import { scoreEventQuality } from "@/lib/quality";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -116,6 +117,55 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
   }
 
   return { eventsProcessed: events.length, eventsTagged, bucketAssignments, errors };
+}
+
+export interface CategoryInferenceResult {
+  eventsScanned: number;
+  eventsUpdated: number;
+  errors: string[];
+}
+
+// Backfills `category` on events where the source adapter left it null.
+// Only updates rows where category IS NULL — source-set values are kept.
+// Runs after classification so buckets are already assigned (no dependency,
+// but the order keeps the ingest response logical).
+export async function runCategoryInference(
+  admin: AdminClient
+): Promise<CategoryInferenceResult> {
+  const events: { id: string; title: string; description: string | null }[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from("events")
+      .select("id, title, description")
+      .eq("status", "published")
+      .eq("is_duplicate", false)
+      .is("category", null)
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    events.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
+  let eventsUpdated = 0;
+  const errors: string[] = [];
+
+  for (const event of events) {
+    const category = inferCategory(event.title, event.description);
+    if (!category) continue;
+
+    const { error } = await admin
+      .from("events")
+      .update({ category })
+      .eq("id", event.id);
+
+    if (error) {
+      errors.push(`event ${event.id}: ${error.message}`);
+    } else {
+      eventsUpdated += 1;
+    }
+  }
+
+  return { eventsScanned: events.length, eventsUpdated, errors };
 }
 
 export interface QualityScoringResult {

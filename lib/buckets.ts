@@ -101,6 +101,11 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "black history", confidence: 0.8 },
     { phrase: "black experience", confidence: 0.85 },
     { phrase: "black stories", confidence: 0.85 },
+
+    // African art context — reliably signals Black/African diaspora art.
+    // "african artist" also matches "South African artist".
+    { phrase: "african art", confidence: 0.8 },
+    { phrase: "african artist", confidence: 0.75 },
   ],
   poc: [
     { phrase: "people of colour", confidence: 0.95 },
@@ -126,6 +131,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "poc-friendly", confidence: 0.8 },
     { phrase: "poc audience", confidence: 0.85 },
     { phrase: "poc audiences", confidence: 0.85 },
+    { phrase: "women of colour", confidence: 0.9 },
+    { phrase: "woman of colour", confidence: 0.9 },
+    { phrase: "women of color", confidence: 0.9 },
   ],
   queer: [
     { phrase: "lgbtq+", confidence: 0.95 },
@@ -180,6 +188,10 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "queer latina", confidence: 0.95 },
     { phrase: "latinx audience", confidence: 0.9 },
     { phrase: "latinx audiences", confidence: 0.9 },
+    { phrase: "latin american art", confidence: 0.8 },
+    { phrase: "latin american artist", confidence: 0.75 },
+    { phrase: "latino art", confidence: 0.7 },
+    { phrase: "latina art", confidence: 0.7 },
   ],
   "east-mon-asian": [
     { phrase: "esea", confidence: 0.9 }, // East and Southeast Asian
@@ -187,12 +199,19 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "east asian", confidence: 0.75 },
     { phrase: "southeast asian", confidence: 0.75 },
     { phrase: "east & southeast asian", confidence: 0.9 },
+    { phrase: "east asian art", confidence: 0.75 },
+    { phrase: "east asian artist", confidence: 0.75 },
+    { phrase: "southeast asian art", confidence: 0.75 },
+    { phrase: "southeast asian artist", confidence: 0.75 },
   ],
   "south-asian": [
     { phrase: "south asian", confidence: 0.8 },
     { phrase: "south asian queer", confidence: 0.95 },
     { phrase: "desi queer", confidence: 0.9 },
     { phrase: "brown joy", confidence: 0.85 },
+    { phrase: "south asian art", confidence: 0.75 },
+    { phrase: "south asian artist", confidence: 0.75 },
+    { phrase: "desi artist", confidence: 0.7 },
   ],
   "disability-friendly": [
     { phrase: "wheelchair accessible", confidence: 0.95 },

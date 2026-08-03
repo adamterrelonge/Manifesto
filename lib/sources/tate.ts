@@ -156,7 +156,7 @@ export async function fetchTateEvents(): Promise<TateRawEvent[]> {
   const seen = new Map<string, TateRawEvent>();
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    const url = `${BASE_URL}/whats-on?date_range=from_now&page=${page}`;
+    const url = `${BASE_URL}/whats-on?page=${page}`;
     const res = await fetch(url, { headers: REQUEST_HEADERS });
     if (!res.ok) break;
 

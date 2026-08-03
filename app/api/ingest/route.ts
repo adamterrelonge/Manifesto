@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidBearerSecret } from "@/lib/auth";
 import { upsertNormalisedEvent } from "@/lib/ingest";
-import { runExpiry, runDedup, runClassification, runQualityScoring } from "@/lib/pipeline";
+import { runExpiry, runDedup, runClassification, runCategoryInference, runQualityScoring } from "@/lib/pipeline";
 import { fetchBarbicanEvents, normaliseBarbicanEvent } from "@/lib/sources/barbican";
 import {
   fetchAllEventbriteEvents,
@@ -47,6 +47,13 @@ import {
   fetchOctoberGalleryEvents,
   normaliseOctoberGalleryEvent,
 } from "@/lib/sources/october-gallery";
+import { fetchWellcomeEvents, normaliseWellcomeEvent } from "@/lib/sources/wellcome";
+import { fetchGasworksEvents, normaliseGasworksEvent } from "@/lib/sources/gasworks";
+import {
+  fetchMuseumOfHomeEvents,
+  normaliseMuseumOfHomeEvent,
+} from "@/lib/sources/museum-of-home";
+import { fetchArnolfiniEvents, normaliseArnolfiniEvent } from "@/lib/sources/arnolfini";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -398,6 +405,66 @@ async function ingestOctoberGallery(admin: AdminClient): Promise<SourceResult> {
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestWellcome(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchWellcomeEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseWellcomeEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.uid}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestGasworks(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchGasworksEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseGasworksEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestMuseumOfHome(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchMuseumOfHomeEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseMuseumOfHomeEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestArnolfini(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchArnolfiniEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseArnolfiniEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -436,6 +503,10 @@ export async function GET(request: NextRequest) {
     africaCentre,
     gallery198,
     octoberGallery,
+    wellcome,
+    gasworks,
+    museumOfHome,
+    arnolfini,
   ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
@@ -456,6 +527,10 @@ export async function GET(request: NextRequest) {
     runSource("africa-centre", () => ingestAfricaCentre(admin)),
     runSource("198-gallery", () => ingest198Gallery(admin)),
     runSource("october-gallery", () => ingestOctoberGallery(admin)),
+    runSource("wellcome", () => ingestWellcome(admin)),
+    runSource("gasworks", () => ingestGasworks(admin)),
+    runSource("museum-of-home", () => ingestMuseumOfHome(admin)),
+    runSource("arnolfini", () => ingestArnolfini(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -482,6 +557,13 @@ export async function GET(request: NextRequest) {
     classify = await runClassification(admin);
   } catch (err) {
     classify = { error: (err as Error).message };
+  }
+
+  let categoryInference: Awaited<ReturnType<typeof runCategoryInference>> | { error: string };
+  try {
+    categoryInference = await runCategoryInference(admin);
+  } catch (err) {
+    categoryInference = { error: (err as Error).message };
   }
 
   let quality: Awaited<ReturnType<typeof runQualityScoring>> | { error: string };
@@ -512,10 +594,15 @@ export async function GET(request: NextRequest) {
       africaCentre,
       gallery198,
       octoberGallery,
+      wellcome,
+      gasworks,
+      museumOfHome,
+      arnolfini,
     },
     expiry,
     dedup,
     classify,
+    categoryInference,
     quality,
   });
 }
