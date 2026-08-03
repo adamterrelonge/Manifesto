@@ -40,41 +40,41 @@ This project treats **aggregation + inclusive categorisation** as the core produ
 
 ```
 ┌──────────────────┐   ┌──────────────────┐   ┌───────────────────────┐
-│  Source Adapters  │   │  Bio-Link Scraper │   │  Manual/Community     │
-│  (Ticketmaster,   │   │  (curated creator │   │  Submissions          │
-│  Skiddle, Dice,    │   │   list + crawler) │   │  (form, later app)    │
-│  RA, Meetup, ...)  │   └────────┬─────────┘   └───────────┬───────────┘
-└────────┬──────────┘            │                          │
-         │                       │                          │
-         └───────────────┬───────┴──────────────┬───────────┘
+│  Source Adapters │   │ Bio-Link Scraper │   │  Manual/Community     │
+│  (Ticketmaster,  │   │ (curated creator │   │  Submissions          │
+│  Skiddle, Dice,  │   │  list + crawler) │   │  (form, later app)    │
+│  RA, Meetup, ...)│   └────────┬─────────┘   └───────────┬───────────┘
+└────────┬─────────┘            │                         │
+         │                      │                         │
+         └───────────────┬──────┴──────────────┬──────────┘
                           ▼
                  ┌──────────────────┐
-                 │  Ingestion Queue  │  (normalise → raw_events table)
+                 │  Ingestion Queue │  (normalise → raw_events table)
                  └────────┬─────────┘
                           ▼
                  ┌──────────────────┐
-                 │  Normalisation &  │  (schema mapping, geocoding,
-                 │  Dedup Pipeline   │   date/time parsing, venue match)
+                 │  Normalisation & │  (schema mapping, geocoding,
+                 │  Dedup Pipeline  │   date/time parsing, venue match)
                  └────────┬─────────┘
                           ▼
                  ┌──────────────────┐
-                 │  AI Enrichment    │  (categorisation buckets,
-                 │  Layer            │   summary, accessibility flags,
-                 │                   │   confidence scores)
+                 │  AI Enrichment   │  (categorisation buckets,
+                 │  Layer           │   summary, accessibility flags,
+                 │                  │   confidence scores)
                  └────────┬─────────┘
                           ▼
                  ┌──────────────────┐
-                 │  Events Database  │  (Postgres + PostGIS for geo)
+                 │  Events Database │  (Postgres + PostGIS for geo)
                  └────────┬─────────┘
                           ▼
         ┌─────────────────┼──────────────────┐
         ▼                 ▼                  ▼
    ┌─────────┐      ┌───────────┐      ┌────────────┐
-   │  API /    │      │  Web App   │      │ Notification│
-   │  tRPC     │◄────┤ (Next.js)  │      │  Service     │
-   │  layer    │      │ List/Cards/│      │ (push/email) │
-   └─────────┘      │  Map views │      └────────────┘
-                     └───────────┘
+   │  API /  │      │  Web App  │      │Notification│
+   │  tRPC   │◄─────┤ (Next.js) │      │  Service   │
+   │  layer  │      │List/Cards/│      │(push/email)│
+   └─────────┘      │ Map views │      └────────────┘
+                    └───────────┘
 ```
 
 ### Suggested stack (fits the existing Next.js app in this repo)

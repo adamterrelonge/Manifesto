@@ -26,25 +26,49 @@ export interface AutographRawEvent {
   url: string;
 }
 
-async function fetchEventSlugs(): Promise<string[]> {
+// Returns "/events/slug" paths from the /events listing page.
+async function fetchEventPaths(): Promise<string[]> {
   const res = await fetch(`${BASE_URL}/events`, { headers: REQUEST_HEADERS });
-  if (!res.ok) throw new Error(`Autograph listing error: ${res.status}`);
+  if (!res.ok) throw new Error(`Autograph events listing error: ${res.status}`);
 
   const $ = cheerio.load(await res.text());
-  const slugs = new Set<string>();
+  const paths = new Set<string>();
 
   $("a[href^='/events/']").each((_, el) => {
     const href = $(el).attr("href")!;
-    // Skip the bare /events listing and any archive/category pages
     const slug = href.replace(/^\/events\//, "").replace(/\/$/, "");
-    if (slug && !slug.includes("/")) slugs.add(slug);
+    if (slug && !slug.includes("/")) paths.add(`/events/${slug}`);
   });
 
-  return [...slugs];
+  return [...paths];
 }
 
-async function fetchEventDetail(slug: string): Promise<AutographRawEvent> {
-  const url = `${BASE_URL}/events/${slug}`;
+// Returns "/exhibitions/slug" paths from the /exhibitions listing page.
+async function fetchExhibitionPaths(): Promise<string[]> {
+  const res = await fetch(`${BASE_URL}/exhibitions`, { headers: REQUEST_HEADERS });
+  if (!res.ok) throw new Error(`Autograph exhibitions listing error: ${res.status}`);
+
+  const $ = cheerio.load(await res.text());
+  const paths = new Set<string>();
+
+  $("a[href^='/exhibitions/']").each((_, el) => {
+    const href = $(el).attr("href")!;
+    const slug = href.replace(/^\/exhibitions\//, "").replace(/\/$/, "");
+    if (slug && !slug.includes("/")) paths.add(`/exhibitions/${slug}`);
+  });
+
+  return [...paths];
+}
+
+// Fetches a detail page at any Autograph path (/events/slug or /exhibitions/slug).
+// Exhibition slugs are prefixed "exhibitions/" so their source IDs don't collide with events.
+async function fetchDetail(path: string): Promise<AutographRawEvent> {
+  const isExhibition = path.startsWith("/exhibitions/");
+  const slug = isExhibition
+    ? "exhibitions/" + path.replace(/^\/exhibitions\//, "").replace(/\/$/, "")
+    : path.replace(/^\/events\//, "").replace(/\/$/, "");
+
+  const url = `${BASE_URL}${path}`;
   const empty: AutographRawEvent = {
     slug,
     title: slug,
@@ -67,8 +91,7 @@ async function fetchEventDetail(slug: string): Promise<AutographRawEvent> {
     const description = $("meta[name='description']").attr("content") ?? null;
     const imageUrl = $("meta[property='og:image']").attr("content") ?? null;
 
-    // Find a heading that contains a month name — Autograph uses headings like
-    // "16 September – 15 November 2025" or dates separated by " || "
+    // Find the first heading that contains a month name
     const dateText = ((): string | null => {
       let found: string | null = null;
       $("h2, h3, h4, p").each((_, el) => {
@@ -85,20 +108,14 @@ async function fetchEventDetail(slug: string): Promise<AutographRawEvent> {
     let endAt: string | null = null;
 
     if (dateText) {
-      // "16 September – 15 November 2025" or "16 September 2025 || 6pm – 9pm"
       const parts = dateText.split(/\s*(?:–|-|\|\|)\s*/);
       const startDate = parseDMY(parts[0]);
       if (startDate) {
-        // Check if parts[1] looks like a time rather than a date
         if (parts[1] && /\d{1,2}[:.]\d{2}|\d{1,2}\s*[ap]m/i.test(parts[1])) {
           const timeResult = parseTime(parts[1].trim());
           if (timeResult) {
-            const withTime = applyTime(startDate, parts[1].trim());
-            startAt = withTime.toISOString();
-            if (parts[2]) {
-              const endTime = applyTime(startDate, parts[2].trim());
-              endAt = endTime.toISOString();
-            }
+            startAt = applyTime(startDate, parts[1].trim()).toISOString();
+            if (parts[2]) endAt = applyTime(startDate, parts[2].trim()).toISOString();
           } else {
             startAt = startDate.toISOString();
           }
@@ -112,7 +129,6 @@ async function fetchEventDetail(slug: string): Promise<AutographRawEvent> {
       }
     }
 
-    // Price detection from body text
     const bodyText = $("body").text();
     const priceMatch = bodyText.match(/£(\d+(?:\.\d{2})?)/);
     const isFree = /\bfree\b/i.test(bodyText);
@@ -125,8 +141,12 @@ async function fetchEventDetail(slug: string): Promise<AutographRawEvent> {
 }
 
 export async function fetchAutographEvents(): Promise<AutographRawEvent[]> {
-  const slugs = await fetchEventSlugs();
-  return mapWithConcurrency(slugs, 3, fetchEventDetail);
+  const [eventPaths, exhibitionPaths] = await Promise.all([
+    fetchEventPaths(),
+    fetchExhibitionPaths(),
+  ]);
+  const allPaths = [...new Set([...eventPaths, ...exhibitionPaths])];
+  return mapWithConcurrency(allPaths, 3, fetchDetail);
 }
 
 export function normaliseAutographEvent(raw: AutographRawEvent): NormalisedEvent {

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import type { ComponentType, SVGProps } from "react";
+import { createBrowserClient } from "@/lib/supabase/browser";
 import {
   FilterIcon,
   ConnectionsIcon,
@@ -131,6 +133,74 @@ export default function Sidebar({
   const [displayedItem, setDisplayedItem] = useState<string | null>(null);
   const [openFilterSection, setOpenFilterSection] = useState<FilterSection | null>(null);
 
+  // ── Auth state ──
+  const [user, setUser] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    try {
+      const supabase = createBrowserClient();
+      supabase.auth.getUser().then(({ data }) => setUser(data.user));
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) setActiveItem(null);
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    } catch {
+      // NEXT_PUBLIC_SUPABASE_* not set — auth box renders in guest state silently
+    }
+    return () => unsubscribe?.();
+  }, []);
+
+  async function handleGoogleSignIn() {
+    setAuthError(null);
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+    } catch {
+      setAuthError("Google sign-in is not configured yet.");
+    }
+  }
+
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const supabase = createBrowserClient();
+      if (authMode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (error) setAuthError(error.message);
+      } else {
+        const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
+        if (error) setAuthError(error.message);
+        else setAuthError("Check your email to confirm your account.");
+      }
+    } catch {
+      setAuthError("Authentication is not available.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+      setActiveItem(null);
+    } catch {
+      // ignore
+    }
+  }
+
   function openItem(label: string) {
     setActiveItem(label);
     setDisplayedItem(label);
@@ -153,32 +223,85 @@ export default function Sidebar({
     setOpenFilterSection((current) => (current === section ? null : section));
   }
 
+  const avatarLetter =
+    user?.user_metadata?.full_name?.charAt(0)?.toUpperCase() ??
+    user?.email?.charAt(0)?.toUpperCase() ??
+    null;
+
   return (
     <aside className="w-80 shrink-0 overflow-hidden bg-[#ffffff] px-8 py-6 font-jbmono text-[#1f271a]">
-      <div className="flex items-center gap-6 text-sm tracking-wide">
-        {DATE_FILTERS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onDateFilterChange(option.value)}
-            className={
-              dateFilter === option.value
-                ? "underline underline-offset-4"
-                : "text-[#1f271a]/50 hover:text-[#1f271a]"
-            }
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
 
-      <div className="relative mt-10 overflow-hidden">
+      {/* ── Auth box ── */}
+      <button
+        type="button"
+        onClick={() => openItem("Account")}
+        className="mb-6 flex w-full items-center gap-3 rounded-xl border border-[#1f271a]/10 px-3 py-2.5 text-left transition-colors duration-200 hover:border-[#1f271a]/25 hover:bg-[#1f271a]/[0.02]"
+      >
+        {user ? (
+          <>
+            {user.user_metadata?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.user_metadata.avatar_url}
+                alt=""
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1f271a] text-sm font-semibold text-white">
+                {avatarLetter ?? "?"}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-[#1f271a]">
+                {user.user_metadata?.full_name ?? "Account"}
+              </p>
+              <p className="truncate text-xs text-[#1f271a]/50">{user.email}</p>
+            </div>
+            <span aria-hidden className="shrink-0 text-lg leading-none text-[#1f271a]/25">⋮</span>
+          </>
+        ) : (
+          <>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#1f271a]/15">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4 text-[#1f271a]/40" aria-hidden>
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
+              </svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-[#1f271a]">Not signed in</p>
+              <p className="text-xs text-[#1f271a]/50">Sign in to save events</p>
+            </div>
+            <span aria-hidden className="shrink-0 text-sm text-[#1f271a]/30">→</span>
+          </>
+        )}
+      </button>
+
+      {/* Date filters + nav slide together so opening any panel sweeps them away */}
+      <div className="relative mt-4 overflow-hidden">
         <div
           className="flex transition-transform duration-500 ease-in-out"
           style={{ transform: activeItem ? "translateX(-100%)" : "translateX(0%)" }}
         >
-          {/* Primary options */}
-          <nav className="flex w-full shrink-0 flex-col gap-5 pr-1">
+          {/* Left column: date filters then primary nav */}
+          <div className="flex w-full shrink-0 flex-col pr-1">
+            <div className="flex items-center gap-6 text-sm tracking-wide">
+              {DATE_FILTERS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onDateFilterChange(option.value)}
+                  className={
+                    dateFilter === option.value
+                      ? "underline underline-offset-4"
+                      : "text-[#1f271a]/50 hover:text-[#1f271a]"
+                  }
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+          <nav className="mt-10 flex w-full shrink-0 flex-col gap-5">
             {SIDEBAR_ITEMS.map(({ label, icon: Icon }, index) => {
               const isLast = index === SIDEBAR_ITEMS.length - 1;
               return (
@@ -198,6 +321,7 @@ export default function Sidebar({
               );
             })}
           </nav>
+          </div>{/* end left column */}
 
           {/* Detail panel — takes over the full width when an option is selected */}
           <div className="w-full shrink-0 pl-1">
@@ -322,7 +446,109 @@ export default function Sidebar({
                 </div>
               )}
 
-              {displayedItem && displayedItem !== "Filter" && (
+              {displayedItem === "Account" && (
+                <div className="flex flex-col gap-4 normal-case tracking-normal">
+                  {user ? (
+                    /* ── Signed-in view ── */
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-3">
+                        {user.user_metadata?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={user.user_metadata.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f271a] text-sm font-semibold text-white">
+                            {avatarLetter ?? "?"}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[#1f271a]">
+                            {user.user_metadata?.full_name ?? "Account"}
+                          </p>
+                          <p className="truncate text-xs text-[#1f271a]/50">{user.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="self-start text-sm text-[#1f271a]/60 underline underline-offset-4 hover:text-[#1f271a]"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  ) : (
+                    /* ── Sign-in / sign-up view ── */
+                    <div className="flex flex-col gap-4">
+                      {/* Google */}
+                      <button
+                        type="button"
+                        onClick={handleGoogleSignIn}
+                        className="flex items-center justify-center gap-2.5 rounded-lg border border-[#1f271a]/20 px-4 py-2.5 text-sm font-medium text-[#1f271a] transition-colors hover:bg-[#1f271a]/5"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Sign in with Google
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <div className="h-px flex-1 bg-[#1f271a]/10" />
+                        <span className="text-xs text-[#1f271a]/40">or</span>
+                        <div className="h-px flex-1 bg-[#1f271a]/10" />
+                      </div>
+
+                      {/* Email / password */}
+                      <form onSubmit={handleEmailAuth} className="flex flex-col gap-3">
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          placeholder="Email"
+                          required
+                          className="rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                        />
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          placeholder="Password"
+                          required
+                          className="rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                        />
+
+                        {authError && (
+                          <p className="text-xs text-red-600">{authError}</p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={authLoading}
+                          className="rounded-lg bg-[#1f271a] py-2 text-sm font-medium text-white disabled:opacity-50"
+                        >
+                          {authLoading ? "…" : authMode === "signin" ? "Sign in" : "Create account"}
+                        </button>
+                      </form>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode(authMode === "signin" ? "signup" : "signin");
+                          setAuthError(null);
+                        }}
+                        className="text-center text-xs text-[#1f271a]/50 hover:text-[#1f271a]"
+                      >
+                        {authMode === "signin"
+                          ? "New here? Create an account"
+                          : "Already have an account? Sign in"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {displayedItem && displayedItem !== "Filter" && displayedItem !== "Account" && (
                 <p className="text-sm normal-case tracking-normal text-[#1f271a]/60">
                   Coming soon.
                 </p>

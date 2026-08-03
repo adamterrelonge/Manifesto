@@ -33,6 +33,20 @@ import {
   normaliseMigrationMuseumEvent,
 } from "@/lib/sources/migration-museum";
 import { fetchVamEastEvents, normaliseVamEastEvent } from "@/lib/sources/vam-east";
+import { fetchBioLinkEvents, normaliseBioLinkEvent } from "@/lib/sources/bio-link";
+import {
+  fetchFactoryInternationalEvents,
+  normaliseFactoryInternationalEvent,
+} from "@/lib/sources/factory-international";
+import {
+  fetchAfricaCentreEvents,
+  normaliseAfricaCentreEvent,
+} from "@/lib/sources/africa-centre";
+import { fetch198Events, normalise198Event } from "@/lib/sources/gallery-198";
+import {
+  fetchOctoberGalleryEvents,
+  normaliseOctoberGalleryEvent,
+} from "@/lib/sources/october-gallery";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -309,6 +323,81 @@ async function ingestVamEast(admin: AdminClient): Promise<SourceResult> {
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestFactoryInternational(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchFactoryInternationalEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseFactoryInternationalEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestAfricaCentre(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchAfricaCentreEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseAfricaCentreEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingest198Gallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetch198Events();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normalise198Event(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.uid}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestBioLinks(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchBioLinkEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseBioLinkEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestOctoberGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchOctoberGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseOctoberGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -341,7 +430,12 @@ export async function GET(request: NextRequest) {
     whitechapel,
     southLondonGallery,
     migrationMuseum,
-  vamEast,
+    vamEast,
+    bioLinks,
+    factoryInternational,
+    africaCentre,
+    gallery198,
+    octoberGallery,
   ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
@@ -357,6 +451,11 @@ export async function GET(request: NextRequest) {
     runSource("south-london-gallery", () => ingestSouthLondonGallery(admin)),
     runSource("migration-museum", () => ingestMigrationMuseum(admin)),
     runSource("vam-east", () => ingestVamEast(admin)),
+    runSource("bio-links", () => ingestBioLinks(admin)),
+    runSource("factory-international", () => ingestFactoryInternational(admin)),
+    runSource("africa-centre", () => ingestAfricaCentre(admin)),
+    runSource("198-gallery", () => ingest198Gallery(admin)),
+    runSource("october-gallery", () => ingestOctoberGallery(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -408,6 +507,11 @@ export async function GET(request: NextRequest) {
       southLondonGallery,
       migrationMuseum,
       vamEast,
+      bioLinks,
+      factoryInternational,
+      africaCentre,
+      gallery198,
+      octoberGallery,
     },
     expiry,
     dedup,
