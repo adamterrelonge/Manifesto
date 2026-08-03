@@ -9,6 +9,10 @@ import {
   normaliseEventbriteEvent,
 } from "@/lib/sources/eventbrite";
 import { EVENTBRITE_ORGANISERS } from "@/lib/sources/eventbrite-organisers";
+import {
+  fetchSerpentineEvents,
+  normaliseSerpentineEvent,
+} from "@/lib/sources/serpentine";
 import { fetchSkiddleEvents, normaliseSkiddleEvent } from "@/lib/sources/skiddle";
 import {
   fetchTicketmasterEvents,
@@ -25,6 +29,10 @@ import {
 // were removed in favour of this one, except dedup/classify/quality which
 // stay reachable standalone too for re-running just one stage.
 export const dynamic = "force-dynamic";
+// Default serverless timeout is too short once Serpentine's 6 listing
+// fetches plus per-event detail fetches are added to the fan-out below;
+// capped harmlessly by the plan's own ceiling if that's lower than 60s.
+export const maxDuration = 60;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -41,6 +49,21 @@ async function ingestBarbican(admin: AdminClient): Promise<SourceResult> {
   for (const event of raw) {
     try {
       await upsertNormalisedEvent(admin, normaliseBarbicanEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestSerpentine(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchSerpentineEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseSerpentineEvent(event));
       upserted += 1;
     } catch (err) {
       errors.push(`event ${event.id}: ${(err as Error).message}`);
@@ -154,9 +177,10 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const [barbican, eventbrite, skiddle, ticketmaster] = await Promise.all([
+  const [barbican, eventbrite, serpentine, skiddle, ticketmaster] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
+    runSource("serpentine", () => ingestSerpentine(admin)),
     runSource("skiddle", () => ingestSkiddle(admin)),
     runSource("ticketmaster", () => ingestTicketmaster(admin)),
   ]);
@@ -195,7 +219,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    sources: { barbican, eventbrite, skiddle, ticketmaster },
+    sources: { barbican, eventbrite, serpentine, skiddle, ticketmaster },
     expiry,
     dedup,
     classify,

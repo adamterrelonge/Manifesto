@@ -208,7 +208,7 @@ Dedup strategy: fuzzy-match on (title similarity + venue + date window) across s
 - Audit every batch pipeline stage (classify, quality, dedup) for the same unpaginated-query row cap already found and fixed in classify/quality — dedup hasn't been checked yet, and any future stage needs to page through `.range()` from day one rather than trusting a single `.select()`.
 - Add a retention/expiry strategy for events whose run has ended (`end_at`, or `start_at` if there's no `end_at`, in the past) so the live/published set doesn't grow unbounded — archive or exclude rather than leaving every past event live forever.
 - Add DB indexes on the columns every pipeline stage and the homepage query filter/order by (`status`, `is_duplicate`, `quality_score`, `start_at`, `end_at`) — query cost only gets worse as row count grows.
-- Keep adding source adapters beyond the current handful (§6), prioritising venues/institutions already scoped as scrapable (e.g. the Barbican pattern), to grow real coverage rather than just fixing the pipe the existing sources flow through.
+- Keep adding source adapters beyond the current handful (§6), prioritising venues/institutions already scoped as scrapable (e.g. the Barbican pattern), to grow real coverage rather than just fixing the pipe the existing sources flow through. Candidate venues are tracked in `docs/SCRAPE_TARGETS.md`.
 
 **Phase 4 — Long tail**
 - Curated creator seed list + link-in-bio scraper.
