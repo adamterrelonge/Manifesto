@@ -140,6 +140,7 @@ export default function Sidebar({
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [hasClaimedOrganiser, setHasClaimedOrganiser] = useState(false);
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -156,6 +157,31 @@ export default function Sidebar({
     }
     return () => unsubscribe?.();
   }, []);
+
+  // Only show "Manage your listing" once there's actually something to
+  // manage — avoids a dead-ended nav item for the vast majority of visitors
+  // who haven't claimed an organiser.
+  useEffect(() => {
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasClaimedOrganiser(false);
+      return;
+    }
+    (async () => {
+      try {
+        const supabase = createBrowserClient();
+        const { data } = await supabase
+          .from("organisers")
+          .select("id")
+          .eq("claimed_by", user.id)
+          .limit(1)
+          .maybeSingle();
+        setHasClaimedOrganiser(!!data);
+      } catch {
+        setHasClaimedOrganiser(false);
+      }
+    })();
+  }, [user]);
 
   async function handleGoogleSignIn() {
     setAuthError(null);
@@ -321,6 +347,20 @@ export default function Sidebar({
               );
             })}
           </nav>
+
+          <div className="mt-8 flex flex-col gap-2 text-xs text-[#1f271a]/40">
+            <a href="/submit" className="transition-colors duration-200 hover:text-[#1f271a]">
+              Submit an event
+            </a>
+            <a href="/claim" className="transition-colors duration-200 hover:text-[#1f271a]">
+              Claim your listing
+            </a>
+            {hasClaimedOrganiser && (
+              <a href="/organiser/manage" className="transition-colors duration-200 hover:text-[#1f271a]">
+                Manage your listing
+              </a>
+            )}
+          </div>
           </div>{/* end left column */}
 
           {/* Detail panel — takes over the full width when an option is selected */}

@@ -28,14 +28,34 @@ export const BIO_LINK_SEEDS: BioLinkSeed[] = [
      bioUrl: "https://linktr.ee/jgpaca",
      notes: "Curating and promoting African and African diaspora cinema and culture. We are based",
    },
-  // {
-  //   handle: "@198gallery",
-  //   bioUrl: "https://beacons.ai/198gallery",
-  //   notes: "198 Contemporary Arts and Learning, Brixton — Black/POC-led",
-  // },
-  // {
-  //   handle: "@queerblackldn",
-  //   bioUrl: "https://linktr.ee/queerblackldn",
-  //   notes: "Queer Black London events and socials",
-  // },
+   {
+     handle: "@blackcuratorscollective",
+     bioUrl: "https://linktr.ee/blackcuratorscollective",
+     notes: "BCC is a collective and forum for Black women and non-binary curators in the UK.",
+   },
+  {
+     handle: "@artbeyondtheshell",
+     bioUrl: "https://linktr.ee/beyondtheshell",
+     notes: "The Turtles",
+   },
+  {
+     handle: "@seedtalks",
+     bioUrl: "https://linktr.ee/seedtalks",
+     notes: "Plant an idea, watch it grow",
+   },
+   {
+     handle: "@blackcommsnetwork",
+     bioUrl: "https://linktr.ee/UKBlackCommsNetwork",
+     notes: "Join us and our 350+ members | free for grads + emerging talent",
+   },
+   {
+     handle: "@blackgrowthuk",
+     bioUrl: "https://linktr.ee/blackgrowthuk",
+     notes: "Farm the Future, Feed the Movement",
+   },
+   {
+     handle: "@bagrifoundation",
+     bioUrl: "https://linktr.ee/bagrifoundation",
+     notes: "Charity cultivating meaningful space for Asian arts and culture✨",
+   },
 ];

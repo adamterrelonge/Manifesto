@@ -47,6 +47,48 @@ Before spending time building selectors for any entry below:
 | Barbican Centre | ✅ Implemented (`lib/sources/barbican.ts`) |
 | Serpentine Galleries | ✅ Implemented (`lib/sources/serpentine.ts`) |
 | Royal Academy of Arts | ❌ Attempted, blocked by Cloudflare Managed Challenge — see `lib/sources/royal-academy.ts`'s removal in git history |
+| Autograph ABP | ✅ Implemented (`lib/sources/autograph.ts`) |
+| 198 Contemporary Arts and Learning | ✅ Implemented (`lib/sources/gallery-198.ts`) |
+| Queer Britain | ✅ Implemented (`lib/sources/queer-britain.ts`) |
+| Gasworks | ✅ Implemented (`lib/sources/gasworks.ts`) |
+| Whitechapel Gallery | ✅ Implemented (`lib/sources/whitechapel.ts`) |
+| ICA | ✅ Implemented (`lib/sources/ica.ts`) |
+| Wellcome Collection | ✅ Implemented (`lib/sources/wellcome.ts`) |
+| South London Gallery | ✅ Implemented (`lib/sources/south-london-gallery.ts`) |
+| Migration Museum | ✅ Implemented (`lib/sources/migration-museum.ts`) |
+| Horniman Museum | ✅ Implemented (`lib/sources/horniman.ts`) |
+| V&A East | ✅ Implemented (`lib/sources/vam-east.ts`) |
+| Tate (Modern/Britain/Liverpool/St Ives) | ✅ Implemented (`lib/sources/tate.ts`) |
+| Museum of the Home | ✅ Implemented (`lib/sources/museum-of-home.ts`) |
+| Arnolfini | ✅ Implemented (`lib/sources/arnolfini.ts`) |
+| Africa Centre | ✅ Implemented (`lib/sources/africa-centre.ts`) — not previously tracked in this list; London, pan-African community/cultural programming |
+| Factory International | ✅ Implemented (`lib/sources/factory-international.ts`) — not previously tracked in this list; Manchester, Aviva Studios |
+| October Gallery | ✅ Implemented (`lib/sources/october-gallery.ts`) — not previously tracked in this list; London (Bloomsbury), African/Asian/Latin American/Islamic art |
+| DaDaFest | ✅ Implemented (`lib/sources/dadafest.ts`) — Liverpool; year-round "Events Programme" listing (distinct from the biennial festival itself) has schema.org `Event` markup, if often thin between festival editions |
+| New Art Exchange | ✅ Implemented (`lib/sources/new-art-exchange.ts`) — Nottingham; JSON-LD event array with pagination, no HTML scraping needed |
+| Attenborough Arts Centre | ✅ Implemented (`lib/sources/attenborough-arts.ts`) — Leicester; first-party "The Events Calendar" JSON REST API, no scraping needed |
+| Cartwright Hall Art Gallery | ✅ Implemented (`lib/sources/cartwright-hall.ts`) — Bradford; venue-filtered listing page + detail-page fetch for exhibition date ranges |
+| Shape Arts | ✅ Implemented (`lib/sources/shape-arts.ts`) — London/nationwide; schema.org `Event` microdata, per-event venue text (no single fixed venue) |
+| Doyle Wham | ❌ Attempted, blocked — `/exhibitions` is a Squarespace blog with only post-publish dates, no real exhibition run dates or JSON-LD `Event` data anywhere on the site |
+| CasildART | ❌ Attempted, blocked — hand-authored Elementor page with inconsistent/freeform dates (mixes real dates, open-call deadlines, "TBD" placeholders, bundled multi-event paragraphs), no structured data |
+| International Slavery Museum | ❌ Attempted, blocked — venue closed for redevelopment since 2025, not expected to reopen until ~2029; zero current/upcoming events in NML's own CMS. (Side-finding: National Museums Liverpool runs a headless Drupal JSON:API behind their Next.js site — reusable if another NML venue, e.g. Walker Art Gallery/World Museum/Museum of Liverpool/Lady Lever, gets scoped later, once one of them has live programming.) |
+| Black Cultural Archives | ❌ Attempted, blocked — Windsor Square building closed for renovation since Feb 2025 with no confirmed reopening date; the site's own `/events` listing has zero forward-scheduled events |
+| British Museum | ❌ Attempted, blocked — Cloudflare Managed Challenge returns `403` to Node's `fetch` (same failure mode as Royal Academy) on every path tested; `robots.txt` also explicitly disallows the live `/exhibitions-events/*` section regardless |
+
+---
+
+## Next batch, round 2 (candidates)
+
+The first proposed batch of 10 (§ below, now resolved: 5 built, 5 blocked)
+skewed toward small/independent orgs, several of which turned out to have no
+scrapeable structured data or to be temporarily closed. Worth pulling the
+next batch more from the National/regional museum tiers below, which have
+tended to have better site infrastructure (JSON-LD, dedicated CMSes) —
+e.g. British Museum's sibling DCMS institutions (National Gallery, National
+Portrait Gallery, Design Museum, Natural History Museum, Science Museum),
+Whitworth/Manchester Art Gallery/HOME (North West cluster), or Somerset
+House/Photographers' Gallery (London independent tier) — each still needs
+the full robots.txt/live-fetch/structured-data check before building.
 
 ---
 
@@ -62,19 +104,19 @@ entries this list misses.
 
 | Name | City | Notes |
 |---|---|---|
-| Autograph ABP | London (Shoreditch) | Black British photography/film, race & representation — mission-critical |
-| 198 Contemporary Arts and Learning | London (Brixton) | Black/POC-led visual arts and education space |
-| Black Cultural Archives | London (Brixton) | African & Caribbean diaspora history — smaller event cadence, high relevance |
-| New Art Exchange | Nottingham | One of the UK's largest dedicated culturally-diverse contemporary art spaces |
-| International Slavery Museum | Liverpool | Part of National Museums Liverpool — directly mission-relevant |
-| Queer Britain | London (King's Cross) | UK's first LGBTQ+ museum |
-| Shape Arts | London | Disability-led arts organisation, runs public programming |
-| DaDaFest | Liverpool | Disability and Deaf-led arts festival/organisation — check for a standing venue vs festival-only calendar |
-| Cartwright Hall Art Gallery | Bradford | Strong South Asian collection/community programming given local demographics |
-| Doyle Wham | London | UK's first gallery dedicated to contemporary African photography |
-| CasildART | London | Black-led, addresses underrepresentation of Black artists |
-| Gasworks | London (Vauxhall) | International contemporary art with strong Global South/diaspora focus |
-| Attenborough Arts Centre | Leicester | Venue built around accessible/inclusive arts practice |
+| Autograph ABP | London (Shoreditch) | ✅ Implemented — Black British photography/film, race & representation — mission-critical |
+| 198 Contemporary Arts and Learning | London (Brixton) | ✅ Implemented — Black/POC-led visual arts and education space |
+| Black Cultural Archives | London (Brixton) | ❌ Blocked — building closed for renovation since Feb 2025, no confirmed reopening date, zero forward-scheduled events on their own listing; re-check once reopened |
+| New Art Exchange | Nottingham | ✅ Implemented — one of the UK's largest dedicated culturally-diverse contemporary art spaces |
+| International Slavery Museum | Liverpool | ❌ Blocked — closed for redevelopment since 2025 (reopening ~2029), zero current/upcoming events; re-check on reopening |
+| Queer Britain | London (King's Cross) | ✅ Implemented — UK's first LGBTQ+ museum |
+| Shape Arts | London | ✅ Implemented — disability-led arts organisation, runs public programming |
+| DaDaFest | Liverpool | ✅ Implemented — Disability and Deaf-led arts organisation; year-round events programme, festival itself is biennial |
+| Cartwright Hall Art Gallery | Bradford | ✅ Implemented — strong South Asian collection/community programming given local demographics |
+| Doyle Wham | London | ❌ Blocked — UK's first gallery dedicated to contemporary African photography, but no real event dates published (blog-post dates only, no JSON-LD) |
+| CasildART | London | ❌ Blocked — Black-led, addresses underrepresentation of Black artists; site has no structured/consistent event dates |
+| Gasworks | London (Vauxhall) | ✅ Implemented — international contemporary art with strong Global South/diaspora focus |
+| Attenborough Arts Centre | Leicester | ✅ Implemented — venue built around accessible/inclusive arts practice |
 
 *Verify before building*: Iniva (Institute of International Visual Arts) has
 reportedly reduced/closed its physical exhibition space in recent years —
@@ -92,11 +134,11 @@ engagement programmes — likely highest event volume of any tier here.
 | British Museum | |
 | National Gallery | |
 | National Portrait Gallery | |
-| Tate Modern | |
-| Tate Britain | |
+| Tate Modern | ✅ Implemented (`lib/sources/tate.ts`) |
+| Tate Britain | ✅ Implemented (`lib/sources/tate.ts`) |
 | Tate Liverpool | Major redevelopment closure in progress — verify reopen status before building |
 | Tate St Ives | |
-| Victoria and Albert Museum (V&A) | Plus **V&A East** (Stratford) — new site, opened 2025/26 |
+| Victoria and Albert Museum (V&A) | Main South Kensington site not yet implemented. **V&A East** (Stratford) — ✅ Implemented (`lib/sources/vam-east.ts`) |
 | Natural History Museum | |
 | Science Museum | Part of Science Museum Group, alongside Science & Industry Museum (Manchester) and National Science and Media Museum (Bradford) |
 | Design Museum | |
@@ -105,8 +147,8 @@ engagement programmes — likely highest event volume of any tier here.
 | London Museum | Formerly Museum of London — relocating to Smithfield, reopening ~2026, verify live listing URL |
 | Wallace Collection | |
 | Sir John Soane's Museum | |
-| Horniman Museum | |
-| Museum of the Home | Formerly Geffrye Museum, Hoxton |
+| Horniman Museum | ✅ Implemented (`lib/sources/horniman.ts`) |
+| Museum of the Home | ✅ Implemented (`lib/sources/museum-of-home.ts`) — formerly Geffrye Museum, Hoxton |
 | Royal Armouries | Leeds (plus Tower of London, Fort Nelson) |
 | National Museums Liverpool | Umbrella for Walker Art Gallery, World Museum, Museum of Liverpool, International Slavery Museum, Lady Lever Art Gallery |
 
@@ -116,19 +158,19 @@ engagement programmes — likely highest event volume of any tier here.
 
 | Name | Notes |
 |---|---|
-| Whitechapel Gallery | |
+| Whitechapel Gallery | ✅ Implemented (`lib/sources/whitechapel.ts`) |
 | Hayward Gallery | Southbank Centre |
-| ICA (Institute of Contemporary Arts) | |
+| ICA (Institute of Contemporary Arts) | ✅ Implemented (`lib/sources/ica.ts`) |
 | The Photographers' Gallery | |
 | Dulwich Picture Gallery | |
 | Courtauld Gallery | |
-| Wellcome Collection | Health/medicine themes, strong disability-relevant programming |
+| Wellcome Collection | ✅ Implemented (`lib/sources/wellcome.ts`) — health/medicine themes, strong disability-relevant programming |
 | Somerset House | Embankment Galleries |
-| South London Gallery | |
+| South London Gallery | ✅ Implemented (`lib/sources/south-london-gallery.ts`) |
 | Camden Art Centre | |
 | Saatchi Gallery | |
 | National Army Museum | |
-| Migration Museum | |
+| Migration Museum | ✅ Implemented (`lib/sources/migration-museum.ts`) |
 | Fashion and Textile Museum | |
 | Estorick Collection | Islington |
 
@@ -240,7 +282,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | Bristol Museum & Art Gallery | Bristol | |
-| Arnolfini | Bristol | |
+| Arnolfini | Bristol | ✅ Implemented (`lib/sources/arnolfini.ts`) |
 | Spike Island | Bristol | |
 | RWA (Royal West of England Academy) | Bristol | |
 | Holburne Museum | Bath | |
