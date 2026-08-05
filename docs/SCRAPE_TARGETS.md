@@ -74,6 +74,11 @@ Before spending time building selectors for any entry below:
 | International Slavery Museum | ❌ Attempted, blocked — venue closed for redevelopment since 2025, not expected to reopen until ~2029; zero current/upcoming events in NML's own CMS. (Side-finding: National Museums Liverpool runs a headless Drupal JSON:API behind their Next.js site — reusable if another NML venue, e.g. Walker Art Gallery/World Museum/Museum of Liverpool/Lady Lever, gets scoped later, once one of them has live programming.) |
 | Black Cultural Archives | ❌ Attempted, blocked — Windsor Square building closed for renovation since Feb 2025 with no confirmed reopening date; the site's own `/events` listing has zero forward-scheduled events |
 | British Museum | ❌ Attempted, blocked — Cloudflare Managed Challenge returns `403` to Node's `fetch` (same failure mode as Royal Academy) on every path tested; `robots.txt` also explicitly disallows the live `/exhibitions-events/*` section regardless |
+| National Gallery | ✅ Implemented (`lib/sources/national-gallery.ts`) — `/whats-on` is a single unpaginated page mixing exhibition cards (`.exhibition-date`, "Until X") and event/tour cards (`.date`, either a real date or unparseable recurring text like "Saturdays (excluding public holidays)") |
+| National Portrait Gallery | ❌ Not attempted — `robots.txt` explicitly disallows `ClaudeBot`/`GPTBot`/etc. via a Cloudflare-managed bot-policy block; skipping on the operator's stated signal rather than testing for a technical bypass |
+| Design Museum | ✅ Implemented (`lib/sources/design-museum.ts`) — not previously tracked in this list; London (Kensington). `/whats-on` is just a nav hub, the real programme is at `/calendar`; card dates are opening hours not exhibition dates, so each event needs a detail-page fetch for the real range (`time.date.icon-date`) |
+| Natural History Museum | ❌ Not attempted — same explicit `ClaudeBot`/`GPTBot` robots.txt block as NPG, plus `robots.txt` separately disallows crawling `/visit/whats-on/programs/*` specifically |
+| Somerset House | ❌ Attempted, blocked — `/whats-on` is a bare client-rendered SPA shell (React/react-helmet), no server-rendered event content in the raw HTML; would need a headless browser or an internal API to be found |
 
 ---
 
@@ -131,9 +136,9 @@ engagement programmes — likely highest event volume of any tier here.
 
 | Name | Notes |
 |---|---|
-| British Museum | |
-| National Gallery | |
-| National Portrait Gallery | |
+| British Museum | ❌ Blocked — see Status table above |
+| National Gallery | ✅ Implemented (`lib/sources/national-gallery.ts`) |
+| National Portrait Gallery | ❌ Skipped — explicit `ClaudeBot`/`GPTBot` robots.txt block, see Status table above |
 | Tate Modern | ✅ Implemented (`lib/sources/tate.ts`) |
 | Tate Britain | ✅ Implemented (`lib/sources/tate.ts`) |
 | Tate Liverpool | Major redevelopment closure in progress — verify reopen status before building |
@@ -165,7 +170,8 @@ engagement programmes — likely highest event volume of any tier here.
 | Dulwich Picture Gallery | |
 | Courtauld Gallery | |
 | Wellcome Collection | ✅ Implemented (`lib/sources/wellcome.ts`) — health/medicine themes, strong disability-relevant programming |
-| Somerset House | Embankment Galleries |
+| Somerset House | ❌ Blocked — client-rendered SPA, see Status table above |
+| Design Museum | ✅ Implemented (`lib/sources/design-museum.ts`) — Kensington |
 | South London Gallery | ✅ Implemented (`lib/sources/south-london-gallery.ts`) |
 | Camden Art Centre | |
 | Saatchi Gallery | |
