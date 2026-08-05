@@ -16,8 +16,6 @@ const VENUE = {
   lng: -0.0724,
 };
 
-const MONTH_RE = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i;
-
 export interface WhitechapelRawEvent {
   slug: string;
   title: string;
@@ -46,45 +44,45 @@ function parseDateRange(text: string): { startAt: string | null; endAt: string |
   return { startAt: single ? single.toISOString() : null, endAt: null };
 }
 
+// Current-event cards render as:
+//   <div class="oneThirdMedia ... mediaBlock">
+//     <a href="https://www.whitechapelgallery.org/events/SLUG/"><img .../></a>
+//     <p class="category_orange">Workshop</p>
+//     <p class="category_name--new"><a href="https://www.whitechapelgallery.org/events/SLUG/">Title</a></p>
+//     <p class="category_date">17 May - 9 Aug 2026</p>
+//     <p class="category_meta_title">Description...</p>
+//     <p class="category_button"><a href="...">Learn More</a></p>
+//   </div>
+// There is no <h3> in this markup — the title is the text of the anchor
+// inside p.category_name--new. Hrefs are absolute (not site-relative).
 function parseListingPage(html: string): WhitechapelRawEvent[] {
   const $ = cheerio.load(html);
   const events: WhitechapelRawEvent[] = [];
 
-  $("a[href*='/events/']").each((_, el) => {
-    const $card = $(el);
-    const href = $card.attr("href") ?? "";
+  $("p.category_name--new > a[href*='/events/']").each((_, el) => {
+    const $titleLink = $(el);
+    const href = $titleLink.attr("href") ?? "";
     if (!href || href.endsWith("/events/")) return;
 
-    const slug = href.replace(/^\/+|\/+$/g, "");
+    const path = href.replace(/^https?:\/\/[^/]+/, "");
+    const slug = path.replace(/^\/+|\/+$/g, "");
     const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
 
-    const title = $card.find("h3").first().text().trim();
+    const title = $titleLink.text().trim();
     if (!title) return;
+
+    let $card = $titleLink.closest(".mediaBlock");
+    if ($card.length === 0) $card = $titleLink.closest("div");
 
     const imageUrl = $card.find("img").first().attr("src") ?? null;
 
-    let dateText: string | null = null;
-    $card.find("p, span").each((_, p) => {
-      if (dateText) return;
-      const t = $(p).text().trim();
-      if (MONTH_RE.test(t)) dateText = t;
-    });
-
-    if (!dateText) {
-      $card.closest("article, li, div").find("p, span, time").each((_, p) => {
-        if (dateText) return;
-        const t = $(p).text().trim();
-        if (MONTH_RE.test(t)) dateText = t;
-      });
-    }
-
+    const dateText = $card.find("p.category_date").first().text().trim() || null;
     const { startAt, endAt } = dateText
       ? parseDateRange(dateText)
       : { startAt: null, endAt: null };
 
     const isFree = /\bfree\b/i.test($card.text());
-    const description =
-      $card.find("p").filter((_, p) => !MONTH_RE.test($(p).text())).first().text().trim() || null;
+    const description = $card.find("p.category_meta_title").first().text().trim() || null;
 
     events.push({ slug, title, description, imageUrl, startAt, endAt, isFree, url });
   });

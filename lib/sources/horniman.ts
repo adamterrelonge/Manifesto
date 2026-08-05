@@ -71,31 +71,14 @@ export async function fetchHornimanEvents(): Promise<HornimanRawEvent[]> {
       $card.find("img").first().attr("data-src") ??
       null;
 
-    // "Thu 6 August 2026"
-    const dateText = ((): string | null => {
-      let found: string | null = null;
-      $card.find("p, span, time").each((_, p) => {
-        if (found) return;
-        const t = $(p).text().trim();
-        if (/\d{4}/.test(t) && /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(t)) {
-          found = t;
-        }
-      });
-      return found;
-    })();
-
-    // "6pm – 9:30pm"
-    const timeText = ((): string | null => {
-      let found: string | null = null;
-      $card.find("p, span, time").each((_, p) => {
-        if (found) return;
-        const t = $(p).text().trim();
-        if (/\d{1,2}[:.]\d{2}\s*[ap]m|\d{1,2}\s*[ap]m/i.test(t)) {
-          found = t;
-        }
-      });
-      return found;
-    })();
+    // Date/time render as dedicated divs (<div class="date">Thu 6 August
+    // 2026</div>, <div class="time">6pm – 9:30pm</div>) — not <p>/<span>/
+    // <time> tags, which is why the previous "search p, span, time" attempt
+    // still matched nothing and every event failed with "no start date"
+    // despite the listing links themselves parsing fine. Verified against
+    // live markup.
+    const dateText = $card.find(".date").first().text().trim() || null;
+    const timeText = $card.find(".time").first().text().trim() || null;
 
     let startAt: string | null = null;
     let endAt: string | null = null;
@@ -121,9 +104,13 @@ export async function fetchHornimanEvents(): Promise<HornimanRawEvent[]> {
       }
     }
 
+    // No parseable date (rare cards use free-text like "See website for
+    // details") — skip rather than push a row normaliseHornimanEvent would
+    // just throw on later.
+    if (!startAt) return;
+
     const isFree = /\bfree\b/i.test($card.text());
-    const description =
-      $card.find("p").filter((_, p) => !$(p).text().includes(dateText ?? "\x00")).first().text().trim() || null;
+    const description = $card.find(".excerpt").first().text().trim() || null;
 
     events.push({ slug, title, description, imageUrl, startAt, endAt, isFree, categoryTag, url });
   });

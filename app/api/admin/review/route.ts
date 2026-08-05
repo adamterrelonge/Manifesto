@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
     .select(
       "event_id, bucket_id, confidence, evidence, assigned_by, events(title, start_at), buckets(slug, label)"
     )
+    // Rejected pairs are kept (not deleted) so re-ingestion doesn't
+    // resurrect them — see 0012_bucket_rejected_state.sql — but there's
+    // nothing left to review, so they never belong in this queue.
+    .neq("assigned_by", "rejected")
     .order("confidence", { ascending: true })
     .limit(500);
 
@@ -75,9 +79,12 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
 
   if (action === "reject") {
+    // Kept, not deleted: runClassification (lib/pipeline.ts) checks for
+    // assigned_by = 'rejected' before re-inserting a keyword match, so a
+    // hard delete here would just let the next ingest resurrect it.
     const { error } = await admin
       .from("event_buckets")
-      .delete()
+      .update({ assigned_by: "rejected" })
       .eq("event_id", eventId)
       .eq("bucket_id", bucketId);
 

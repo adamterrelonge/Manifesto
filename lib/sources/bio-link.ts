@@ -3,7 +3,10 @@ import type { NormalisedEvent } from "@/lib/types";
 import { REQUEST_HEADERS, parseDMY } from "./scrape-utils";
 import { BIO_LINK_SEEDS, type BioLinkSeed } from "./bio-link-seeds";
 
-// Ticketing platforms whose URLs are themselves proof that a link is an event.
+// Ticketing platforms whose URLs are themselves proof that a link is an
+// event, AND whose event pages are one-URL-per-event (safe to trust a JSON-LD
+// Event block found there as belonging to this specific link — see
+// fetchStructuredStartAt below).
 const TICKETING_HOSTS = new Set([
   "eventbrite.co.uk", "eventbrite.com",
   "dice.fm",
@@ -14,6 +17,7 @@ const TICKETING_HOSTS = new Set([
   "ticketweb.co.uk",
   "wegottickets.com",
   "universe.com",
+  "buytickets.at",
 ]);
 
 const DATE_IN_TEXT_RE =
@@ -66,6 +70,51 @@ function extractStartAt(text: string): string | null {
   }
 
   return null;
+}
+
+// A Linktree/Beacons anchor's visible text is almost never a date — it's
+// just the event name ("The ADHD Women Summit London 2026"). The actual date
+// lives on the destination ticketing page. For hosts where one URL is always
+// exactly one event (TICKETING_HOSTS), that page's schema.org Event JSON-LD
+// is a trustworthy source — verified directly against live Eventbrite and
+// buytickets.at pages, both returning a single Event object whose startDate
+// matches the specific linked event. NOT extended to arbitrary/custom-domain
+// links: a generic page (e.g. a creator's own site) can list many sessions
+// under one URL, and grabbing "the first Event on the page" there risks
+// attaching the wrong date to the wrong link.
+async function fetchStructuredStartAt(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { headers: REQUEST_HEADERS });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const blocks = html.matchAll(
+      /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+    );
+    for (const block of blocks) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(block[1]);
+      } catch {
+        continue;
+      }
+      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of candidates) {
+        const record = item as { "@type"?: string | string[]; startDate?: string };
+        const type = record["@type"];
+        const isEvent = Array.isArray(type)
+          ? type.some((t) => /event/i.test(t))
+          : typeof type === "string" && /event/i.test(type);
+        if (isEvent && record.startDate) {
+          const d = new Date(record.startDate);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Platform-specific parsers ──────────────────────────────────────────────
@@ -165,12 +214,23 @@ async function scrapeSeed(seed: BioLinkSeed): Promise<BioLinkRawEvent[]> {
 
     const slug = `${seed.handle}::${link.url}`;
 
+    // Link text rarely carries a date; fall back to the destination
+    // ticketing page's own structured data before giving up.
+    let startAt = extractStartAt(link.title);
+    if (!startAt && isTicketingUrl(link.url)) {
+      startAt = await fetchStructuredStartAt(link.url);
+    }
+    // Neither source produced a date (e.g. a custom-domain hub page with no
+    // structured data) — skip rather than push a row that would just error
+    // in normaliseBioLinkEvent.
+    if (!startAt) continue;
+
     events.push({
       slug,
       handle: seed.handle,
       title: link.title || seed.handle,
       description: seed.notes,
-      startAt: extractStartAt(link.title),
+      startAt,
       endAt: null,
       isFree: /\bfree\b/i.test(link.title),
       sourceUrl: link.url,

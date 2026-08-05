@@ -76,6 +76,26 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
     if (!data || data.length < PAGE_SIZE) break;
   }
 
+  // (event_id, bucket_id) pairs a moderator has already approved or
+  // rejected at /admin/review are permanent decisions — re-classifying on
+  // every ingest must never overwrite them, or every review gets silently
+  // undone the next time the source is re-scraped. Scanning all
+  // moderator/rejected rows up front (rather than filtering per-event) is
+  // cheap since reviewed pairs are always a small fraction of all events.
+  const lockedPairs = new Set<string>();
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from("event_buckets")
+      .select("event_id, bucket_id")
+      .in("assigned_by", ["moderator", "rejected"])
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      lockedPairs.add(`${row.event_id}:${row.bucket_id}`);
+    }
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
   let eventsTagged = 0;
   let bucketAssignments = 0;
   const errors: string[] = [];
@@ -92,6 +112,7 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
       .map((match) => {
         const bucketId = bucketIdBySlug.get(match.bucketSlug);
         if (!bucketId) return null;
+        if (lockedPairs.has(`${event.id}:${bucketId}`)) return null;
         return {
           event_id: event.id,
           bucket_id: bucketId,
@@ -218,4 +239,30 @@ export async function runQualityScoring(admin: AdminClient): Promise<QualityScor
   }
 
   return { eventsProcessed: events.length, scored, errors };
+}
+
+export interface PruneResult {
+  duplicatesRemoved: number;
+  expiredRemoved: number;
+  lowQualityRemoved: number;
+}
+
+// Deletes rows that quality/dedup/expiry only ever flagged, never removed —
+// see supabase/migrations/0013_prune_events.sql for exactly what qualifies
+// and why each grace period exists. Run last, after quality scoring, so
+// is_duplicate/status/quality_score all reflect this run before anything
+// gets deleted.
+export async function runPrune(admin: AdminClient): Promise<PruneResult> {
+  const { data, error } = await admin.rpc("prune_events");
+  if (error) throw new Error(`Prune pass failed: ${error.message}`);
+  const row = data?.[0] ?? {
+    duplicates_removed: 0,
+    expired_removed: 0,
+    low_quality_removed: 0,
+  };
+  return {
+    duplicatesRemoved: row.duplicates_removed ?? 0,
+    expiredRemoved: row.expired_removed ?? 0,
+    lowQualityRemoved: row.low_quality_removed ?? 0,
+  };
 }

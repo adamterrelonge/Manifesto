@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidBearerSecret } from "@/lib/auth";
 import { upsertNormalisedEvent } from "@/lib/ingest";
-import { runExpiry, runDedup, runClassification, runCategoryInference, runQualityScoring } from "@/lib/pipeline";
+import {
+  runExpiry,
+  runDedup,
+  runClassification,
+  runCategoryInference,
+  runQualityScoring,
+  runPrune,
+} from "@/lib/pipeline";
 import { fetchBarbicanEvents, normaliseBarbicanEvent } from "@/lib/sources/barbican";
 import {
   fetchAllEventbriteEvents,
@@ -160,7 +167,11 @@ async function ingestSkiddle(admin: AdminClient): Promise<SourceResult> {
 
   type SkiddleEvent = Awaited<ReturnType<typeof fetchSkiddleEvents>>[number];
   const raw: SkiddleEvent[] = [];
-  const MAX_PAGES = 3;
+  // Was 3 — the last ingest run returned exactly 3 full pages of 100
+  // (300/300), the signature of hitting this cap rather than genuinely
+  // running out of results. Barbican already pages up to 20 deep within
+  // the same maxDuration=60s budget below, so this has headroom.
+  const MAX_PAGES = 6;
   for (let page = 0; page < MAX_PAGES; page++) {
     const batch = await fetchSkiddleEvents({ minDate, maxDate, offset: page * 100 });
     raw.push(...batch);
@@ -189,7 +200,9 @@ async function ingestTicketmaster(admin: AdminClient): Promise<SourceResult> {
 
   type TicketmasterEventItem = Awaited<ReturnType<typeof fetchTicketmasterEvents>>[number];
   const raw: TicketmasterEventItem[] = [];
-  const MAX_PAGES = 2;
+  // Was 2 — the last ingest run returned exactly 2 full pages of 200
+  // (400/400), the same hit-the-cap signature as Skiddle above.
+  const MAX_PAGES = 4;
   for (let page = 0; page < MAX_PAGES; page++) {
     const batch = await fetchTicketmasterEvents({ startDateTime, endDateTime, page });
     raw.push(...batch);
@@ -672,6 +685,15 @@ export async function GET(request: NextRequest) {
     quality = { error: (err as Error).message };
   }
 
+  // Last: deletes rows quality/dedup/expiry only flagged, using this run's
+  // freshly-set is_duplicate/status/quality_score.
+  let prune: Awaited<ReturnType<typeof runPrune>> | { error: string };
+  try {
+    prune = await runPrune(admin);
+  } catch (err) {
+    prune = { error: (err as Error).message };
+  }
+
   return NextResponse.json({
     sources: {
       barbican,
@@ -708,5 +730,6 @@ export async function GET(request: NextRequest) {
     classify,
     categoryInference,
     quality,
+    prune,
   });
 }

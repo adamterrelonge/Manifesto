@@ -47,13 +47,19 @@ export async function fetchMigrationMuseumEvents(): Promise<MigrationMuseumRawEv
   const events: MigrationMuseumRawEvent[] = [];
   const seen = new Set<string>();
 
-  const $cards = $("article.tribe-event, article.event, article, .tribe-event, .event").filter(
+  // Site now runs the "EventPrime" WP plugin (ep-* classes) instead of the old
+  // "The Events Calendar" plugin (tribe-* classes / <article> cards). Each event
+  // in the list view is a <div class="ep-event-list-item">.
+  const $cards = $(".ep-event-list-item, article.tribe-event, article.event, .tribe-event, .event").filter(
     (_, el) => $(el).find("a[href]").length > 0
   );
 
   $cards.each((_, el) => {
     const $card = $(el);
-    const $link = $card.find("a[href]").first();
+    // Title/detail-page link: the title itself is a plain <a data-event-id="...">
+    // with no wrapping heading tag, so it doubles as both the href and title source.
+    const $titleLink = $card.find("a[data-event-id]").first();
+    const $link = $titleLink.length ? $titleLink : $card.find("a[href]").first();
     const href = $link.attr("href") ?? "";
     if (!href) return;
 
@@ -62,7 +68,9 @@ export async function fetchMigrationMuseumEvents(): Promise<MigrationMuseumRawEv
     seen.add(slug);
 
     const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
-    const title = $card.find("h1, h2, h3").first().text().trim();
+    const title = $titleLink.length
+      ? $titleLink.text().trim()
+      : $card.find("h1, h2, h3").first().text().trim();
     if (!title) return;
 
     const imageUrl = $card.find("img").first().attr("src") ?? null;
@@ -70,7 +78,8 @@ export async function fetchMigrationMuseumEvents(): Promise<MigrationMuseumRawEv
     let startAt: string | null = null;
     let endAt: string | null = null;
 
-    // Prefer time[datetime] attribute
+    // Prefer time[datetime] attribute (kept as a defensive fallback; the current
+    // EventPrime markup does not render one).
     const $startTime = $card.find("time[datetime]").first();
     if ($startTime.length) {
       const dt = $startTime.attr("datetime");
@@ -81,12 +90,20 @@ export async function fetchMigrationMuseumEvents(): Promise<MigrationMuseumRawEv
         if (endDt) endAt = new Date(endDt).toISOString();
       }
     } else {
+      // EventPrime renders the date/time as plain text inside
+      // .ep-event-list-view-action, e.g. "Wed, July 15, 2026 - September 6, 2026"
+      // or "Thu, August 13, 2026, 11:00 AM".
       let dateText: string | null = null;
-      $card.find("p, span, abbr, .tribe-event-date-start, .tribe-event-schedule-details").each((_, p) => {
-        if (dateText) return;
-        const t = $(p).text().trim();
-        if (MONTH_NAME_RE.test(t)) dateText = t;
-      });
+      const $actionDate = $card.find(".ep-event-list-view-action, .ep-event-date").first();
+      if ($actionDate.length && MONTH_NAME_RE.test($actionDate.text())) {
+        dateText = $actionDate.text().trim();
+      } else {
+        $card.find("p, span, abbr").each((_, p) => {
+          if (dateText) return;
+          const t = $(p).text().trim();
+          if (MONTH_NAME_RE.test(t)) dateText = t;
+        });
+      }
       if (dateText) {
         const parsed = parseMigrationDate(dateText);
         startAt = parsed.startAt;
@@ -95,13 +112,16 @@ export async function fetchMigrationMuseumEvents(): Promise<MigrationMuseumRawEv
     }
 
     const isFree = /\bfree\b/i.test($card.text());
-    const description =
-      $card
-        .find("p")
-        .filter((_, p) => !MONTH_NAME_RE.test($(p).text()))
-        .first()
-        .text()
-        .trim() || null;
+    // Description lives in a dedicated .ep-box-list-desc div (not a <p>).
+    const $descDiv = $card.find(".ep-box-list-desc").first();
+    const description = $descDiv.length
+      ? $descDiv.text().trim() || null
+      : $card
+          .find("p")
+          .filter((_, p) => !MONTH_NAME_RE.test($(p).text()))
+          .first()
+          .text()
+          .trim() || null;
 
     events.push({ slug, title, description, imageUrl, startAt, endAt, isFree, url });
   });

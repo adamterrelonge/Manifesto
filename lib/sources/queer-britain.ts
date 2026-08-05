@@ -14,8 +14,8 @@ const VENUE = {
   lng: -0.1227,
 };
 
-// Matches "22 JULY / 6.30PM" or "5 August / 2PM"
-const DATE_PATTERN = /^(\d{1,2}\s+[A-Za-z]+)\s*\/\s*([\d.:]+\s*[AP]M)/i;
+// Matches "22 JULY / 6.30PM", "5 August / 2PM", or "19 AUG / FROM 6:30PM"
+const DATE_PATTERN = /^(\d{1,2}\s+[A-Za-z]+)\s*\/\s*(?:FROM\s+)?([\d.:]+\s*[AP]M)/i;
 
 export interface QueerBritainRawEvent {
   id: string;
@@ -36,14 +36,20 @@ function slugify(title: string): string {
 }
 
 export async function fetchQueerBritainEvents(): Promise<QueerBritainRawEvent[]> {
-  const res = await fetch(`${BASE_URL}/whats-on`, { headers: REQUEST_HEADERS });
+  const res = await fetch(`${BASE_URL}/events`, { headers: REQUEST_HEADERS });
   if (!res.ok) throw new Error(`Queer Britain listing error: ${res.status}`);
 
   const $ = cheerio.load(await res.text());
   const events: QueerBritainRawEvent[] = [];
   const seen = new Set<string>();
 
-  // Walk all elements looking for ones whose text matches the date pattern
+  // The site is a page-builder (non-semantic div soup): each event lives in
+  // its own <div id="pt-section-canvas-N"> block, with the date/ticket line
+  // buried several levels deep in a <span>. .closest("div") only reaches the
+  // nearest tiny wrapper div — not the whole event block — so the real <h1>
+  // title (a sibling several levels up) was never found and every event got
+  // silently dropped. Climbing to the id="pt-section-canvas-*" ancestor
+  // first fixes this; falls back to the old behaviour if that id is absent.
   $("*").each((_, el) => {
     const $el = $(el);
     // Only look at leaf-ish containers — skip html/body/div wrappers
@@ -53,11 +59,18 @@ export async function fetchQueerBritainEvents(): Promise<QueerBritainRawEvent[]>
     const dateMatch = text.match(DATE_PATTERN);
     if (!dateMatch) return;
 
-    // Walk up to find the event container (has a title sibling/child)
-    const $container = $el.closest("article, section, div, li");
-    const title =
-      $container.find("h1, h2, h3, h4").first().text().trim() ||
-      $el.prevAll("h1, h2, h3, h4").first().text().trim();
+    const $canvas = $el.closest("[id^='pt-section-canvas-']");
+    const $container = $canvas.length ? $canvas : $el.closest("article, section, div, li");
+
+    // Multiple <h1> tags exist per block (main title, then a subtitle line
+    // like "COFFEE MORNING") — the first non-empty one is the real title.
+    let title = "";
+    $container.find("h1, h2, h3, h4").each((_, h) => {
+      if (title) return;
+      const t = $(h).text().trim();
+      if (t) title = t;
+    });
+    if (!title) title = $el.prevAll("h1, h2, h3, h4").first().text().trim();
 
     if (!title || seen.has(title)) return;
     seen.add(title);
@@ -87,8 +100,15 @@ export async function fetchQueerBritainEvents(): Promise<QueerBritainRawEvent[]>
 
     const isFree = /\bfree\b/i.test($container.text());
 
-    const description =
-      $container.find("p").first().text().trim() || null;
+    // Decorative labels ("AUG", "12", "COFFEE MORNING") also live in <p>/<h1>
+    // tags within the same block — only a real sentence-length paragraph
+    // counts as the description.
+    let description: string | null = null;
+    $container.find("p").each((_, p) => {
+      if (description) return;
+      const t = $(p).text().trim();
+      if (t.length >= 25) description = t;
+    });
 
     events.push({ id, title, description, imageUrl, startAt, endAt: null, isFree, ticketUrl: ticketLink });
   });
@@ -115,7 +135,7 @@ export function normaliseQueerBritainEvent(raw: QueerBritainRawEvent): Normalise
     source: {
       provider: "queer-britain",
       id: raw.id,
-      url: raw.ticketUrl ?? `${BASE_URL}/whats-on`,
+      url: raw.ticketUrl ?? `${BASE_URL}/events`,
     },
   };
 }
