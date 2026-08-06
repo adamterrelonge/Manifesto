@@ -58,4 +58,9 @@ export const BIO_LINK_SEEDS: BioLinkSeed[] = [
      bioUrl: "https://linktr.ee/bagrifoundation",
      notes: "Charity cultivating meaningful space for Asian arts and culture✨",
    },
+   {
+     handle: "@eseacommunitycentre",
+     bioUrl: "https://linktr.ee/eseacommunitycentre",
+     notes: "East and Southeast Asian Community Centre (formerly Hackney Chinese Community Services) — runs supper clubs, workshops, and queer community events; booking links go through OutSavvy (a supported ticketing host).",
+   },
 ];

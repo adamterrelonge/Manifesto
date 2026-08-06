@@ -79,6 +79,16 @@ Before spending time building selectors for any entry below:
 | Design Museum | ✅ Implemented (`lib/sources/design-museum.ts`) — not previously tracked in this list; London (Kensington). `/whats-on` is just a nav hub, the real programme is at `/calendar`; card dates are opening hours not exhibition dates, so each event needs a detail-page fetch for the real range (`time.date.icon-date`) |
 | Natural History Museum | ❌ Not attempted — same explicit `ClaudeBot`/`GPTBot` robots.txt block as NPG, plus `robots.txt` separately disallows crawling `/visit/whats-on/programs/*` specifically |
 | Somerset House | ❌ Attempted, blocked — `/whats-on` is a bare client-rendered SPA shell (React/react-helmet), no server-rendered event content in the raw HTML; would need a headless browser or an internal API to be found |
+| Sir John Soane's Museum | ✅ Implemented (`lib/sources/soane.ts`) — paginated `/whats-on` (`?page=N`), each card has two `<time datetime>` ISO timestamps directly, no detail-page fetch needed |
+| The Photographers' Gallery | ✅ Implemented (`lib/sources/photographers-gallery.ts`) — paginated `/whats-on` (`?page=N`); dates are free text on most cards (`<time datetime>` only present on a minority), so always parsed from the `.o-teaser__date` paragraph text for one consistent path |
+| Science Museum | ❌ Attempted, blocked — `/see-and-do` is a marketing "Highlights" carousel (permanent galleries + retail promos), not an exhibitions/events listing; only 1 of ~10 `.c-card` items has a real date, the rest are "Open daily, HH:MM" opening hours. No dedicated whats-on/exhibitions aggregator page found (`/whats-on` is `404`). |
+| IWM London | ❌ Attempted, blocked — `/visits/iwm-london/whats-on`'s event section is `<div id="events-listing">`, rendered client-side by a JS component (`data-component-id="iwm_theme:event_teaser_list"`); zero events in the raw server-rendered HTML |
+| Royal Museums Greenwich | ❌ Attempted, blocked — `/whats-on`'s `<div id="events-search-results">` is empty in the raw HTML, populated by a client-side JS app (`id="root"` present); same client-rendered pattern as Somerset House |
+| The Whitworth (Manchester) | ❌ Attempted, blocked — `/whats-on` has no server-rendered card/teaser/listing markup at all despite the `200` and 19 raw `<a>` links picked up in the initial pass; content is client-rendered |
+| BALTIC (Gateshead) | ❌ Attempted, blocked — `/whats-on` (~1MB page) has no server-rendered card/event markup anywhere in the raw HTML; heavily client-rendered SPA, same pattern as Somerset House |
+| Hayward Gallery (Southbank Centre) | ❌ Attempted, blocked — robots.txt itself is permissive, but `/whats-on` returns `403` to Node's `fetch` (same Cloudflare/WAF false-pass pattern as Royal Academy: looks fine to WebFetch/curl, blocked for the runtime Vercel actually uses) |
+| Dulwich Picture Gallery | ❌ Attempted, blocked — robots.txt permissive (`Disallow: /admin/*` only), but `/exhibitions` returns `403` to Node's `fetch`, same Cloudflare/WAF pattern |
+| Wallace Collection | ❌ Not attempted — robots.txt explicitly blocks `ClaudeBot`/`GPTBot`/`CCBot`/`Amazonbot`/`Applebot-Extended`/`Bytespider`/`Google-Extended`/`meta-externalagent`/`CloudflareBrowserRenderingCrawler` with `Disallow: /`; skipping per the operator's stated signal, same policy as NPG/NHM |
 
 ---
 
@@ -155,7 +165,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Horniman Museum | ✅ Implemented (`lib/sources/horniman.ts`) |
 | Museum of the Home | ✅ Implemented (`lib/sources/museum-of-home.ts`) — formerly Geffrye Museum, Hoxton |
 | Royal Armouries | Leeds (plus Tower of London, Fort Nelson) |
-| National Museums Liverpool | Umbrella for Walker Art Gallery, World Museum, Museum of Liverpool, International Slavery Museum, Lady Lever Art Gallery |
+| National Museums Liverpool | Umbrella for Walker Art Gallery, World Museum, Museum of Liverpool, International Slavery Museum, Lady Lever Art Gallery. 🔶 Re-attempted — the headless Drupal JSON:API noted below (`/jsonapi/node/event`) now times out (`504`) rather than the `200` seen when first discovered; not pursued further this round, worth a retry later rather than treating as a hard block |
 
 ---
 
@@ -173,12 +183,13 @@ engagement programmes — likely highest event volume of any tier here.
 | Somerset House | ❌ Blocked — client-rendered SPA, see Status table above |
 | Design Museum | ✅ Implemented (`lib/sources/design-museum.ts`) — Kensington |
 | South London Gallery | ✅ Implemented (`lib/sources/south-london-gallery.ts`) |
-| Camden Art Centre | |
-| Saatchi Gallery | |
+| Camden Art Centre | ❌ Attempted, blocked — `/whats-on`'s only server-rendered card is a single "Highlight" banner; the actual programme grid is `<div id="app"><router-view></router-view></div>`, a client-rendered Vue SPA |
+| Saatchi Gallery | 🔶 Attempted, inconclusive — `/whats-on/upcoming/` is a hand-authored Elementor (WordPress page builder) layout; no `Event` JSON-LD and no obvious repeating card/date structure found in a first pass. Not pursued further this round given the project's past experience with Elementor pages (CasildART, Doyle Wham) — worth a second look if revisited |
 | National Army Museum | |
 | Migration Museum | ✅ Implemented (`lib/sources/migration-museum.ts`) |
-| Fashion and Textile Museum | |
-| Estorick Collection | Islington |
+| Fashion and Textile Museum | ✅ Implemented (`lib/sources/fashion-textile-museum.ts`) — no HTML scraping needed, the listing's own client-side filter calls a first-party JSON REST endpoint (`/wp-json/ftmfilteredcards/v1/posts`) directly, with clean `date_from`/`date_to` fields |
+| National Army Museum | ✅ Implemented (`lib/sources/national-army-museum.ts`) — paginated `/whats-on` (`?page=N`), date text is either a single date or a same-month day range ("6-7 Aug 2026") |
+| Estorick Collection | Islington — attempted alongside this batch, no `Event` JSON-LD or `<time>`/date-class markup found on `/exhibitions`; not pursued further this round |
 
 ---
 
@@ -189,7 +200,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Manchester Art Gallery | Manchester | |
 | The Whitworth | Manchester | University of Manchester |
 | Manchester Museum | Manchester | |
-| HOME | Manchester | Contemporary art, theatre, cinema |
+| HOME | Manchester | ✅ Implemented (`lib/sources/home-manchester.ts`) — paginated `/whats-on`; `.start`/`.end` date spans carry no year, so it's inferred from the end date and the start borrows it (stepping back a year if that would put start after end) |
 | Castlefield Gallery | Manchester | |
 | Walker Art Gallery | Liverpool | National Museums Liverpool |
 | World Museum | Liverpool | National Museums Liverpool |
@@ -222,8 +233,8 @@ engagement programmes — likely highest event volume of any tier here.
 |---|---|---|
 | Leeds Art Gallery | Leeds | |
 | Henry Moore Institute | Leeds | |
-| The Hepworth Wakefield | Wakefield | |
-| Yorkshire Sculpture Park | Wakefield | |
+| The Hepworth Wakefield | Wakefield | ✅ Implemented (`lib/sources/hepworth-wakefield.ts`) — `/whats-on/` cards have a free-text date with extra trailing info after the first comma ("...2026, FREE for Members..."); only the part before the comma is parsed |
+| Yorkshire Sculpture Park | Wakefield | ✅ Implemented (`lib/sources/yorkshire-sculpture-park.ts`) — `/whats-on/exhibitions` cards carry `<time itemprop=startDate/endDate>` with clean ISO `datetime` attributes directly, no text parsing needed |
 | York Art Gallery | York | |
 | Millennium Gallery | Sheffield | |
 | Graves Gallery | Sheffield | |
@@ -238,13 +249,13 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | New Art Exchange | Nottingham | See community section above |
-| Nottingham Contemporary | Nottingham | |
+| Nottingham Contemporary | Nottingham | 🔶 Attempted, inconclusive — `/whats-on/` returns `200` but no card/date markup found in a first pass; not pursued further this round |
 | Djanogly Gallery | Nottingham | |
 | New Walk Museum & Art Gallery | Leicester | |
 | Attenborough Arts Centre | Leicester | See community section above |
 | Derby Museum and Art Gallery | Derby | |
 | Birmingham Museum & Art Gallery | Birmingham | |
-| Ikon Gallery | Birmingham | |
+| Ikon Gallery | Birmingham | 🔶 Attempted, inconclusive — `/whats-on/exhibitions` returns `200` but no `Event`/date/card/teaser class markup found in a first pass; not pursued further this round |
 | mac Birmingham | Birmingham | Midlands Art Centre |
 | Wolverhampton Art Gallery | Wolverhampton | |
 | Herbert Art Gallery & Museum | Coventry | |
@@ -269,8 +280,8 @@ engagement programmes — likely highest event volume of any tier here.
 
 | Name | City | Notes |
 |---|---|---|
-| Turner Contemporary | Margate | |
-| Pallant House Gallery | Chichester | |
+| Turner Contemporary | Margate | ❌ Not attempted — robots.txt explicitly blocks `GPTBot` (and by the same policy block likely other AI crawlers) with `Disallow: /`; skipping per the operator's stated signal, same policy as NPG/NHM/Wallace Collection |
+| Pallant House Gallery | Chichester | ✅ Implemented (`lib/sources/pallant-house.ts`) — `/exhibitions` cards' `<time datetime>` attribute is always empty in practice, so the visible text is parsed instead; a "Spring 2027"-style unparseable end date degrades to a null `endAt` rather than dropping the event |
 | Towner Eastbourne | Eastbourne | |
 | De La Warr Pavilion | Bexhill-on-Sea | |
 | Ashmolean Museum | Oxford | |
@@ -303,9 +314,9 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | National Museum of Scotland | Edinburgh | National Museums Scotland |
-| Scottish National Gallery | Edinburgh | National Galleries of Scotland |
-| Scottish National Portrait Gallery | Edinburgh | National Galleries of Scotland |
-| Scottish National Gallery of Modern Art | Edinburgh | Modern One & Two |
+| Scottish National Gallery | Edinburgh | National Galleries of Scotland — ❌ Attempted, blocked — `403` to Node fetch on the homepage itself (Cloudflare/WAF), same failure mode as Royal Academy/Manchester Art Gallery |
+| Scottish National Portrait Gallery | Edinburgh | National Galleries of Scotland — same `403` block as above |
+| Scottish National Gallery of Modern Art | Edinburgh | Modern One & Two — same `403` block as above |
 | Fruitmarket Gallery | Edinburgh | |
 | Talbot Rice Gallery | Edinburgh | University of Edinburgh |
 | Stills | Edinburgh | Photography |
