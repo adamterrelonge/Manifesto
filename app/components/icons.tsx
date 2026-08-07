@@ -194,6 +194,79 @@ export function CommunityIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+      <rect
+        x="7" y="13" width="4" height="4" rx="0.5"
+        fill="currentColor"
+        stroke="none"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
+export function LocationPinIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <g
+        style={{ transformBox: "fill-box", transformOrigin: "bottom center" }}
+        className="group-hover:[animation:sidebar-pin-bounce_0.5s_ease-in-out]"
+      >
+        <path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.3" />
+      </g>
+    </svg>
+  );
+}
+
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <rect x="4" y="10" width="16" height="10" rx="2" />
+      <path
+        d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10"
+        style={{ transformBox: "fill-box", transformOrigin: "bottom center" }}
+        className="group-hover:[animation:sidebar-pin-bounce_0.5s_ease-in-out]"
+      />
+      <circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function MailIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path
+        d="M4 7l8 6 8-6"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
+export function TrashIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+      <path
+        d="M9 3.5h6a1 1 0 0 1 1 1V7H8V4.5a1 1 0 0 1 1-1Z"
+        style={{ transformBox: "fill-box", transformOrigin: "bottom center" }}
+        className="group-hover:[animation:sidebar-pin-bounce_0.5s_ease-in-out]"
+      />
+    </svg>
+  );
+}
+
 export function GappedArrowIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...BASE_PROPS} strokeWidth={2} strokeLinecap="round" {...props}>

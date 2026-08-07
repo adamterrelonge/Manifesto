@@ -15,10 +15,30 @@ import {
   PriceIcon,
   CategoryIcon,
   CommunityIcon,
+  CalendarIcon,
+  LocationPinIcon,
+  LockIcon,
+  MailIcon,
+  TrashIcon,
 } from "@/app/components/icons";
 import { CATEGORY_LABELS, type Category } from "@/lib/categories";
 import { BUCKET_LABELS, NON_QUALIFYING_BUCKETS, type BucketSlug } from "@/lib/buckets";
 import type { DateFilter } from "@/lib/date-filter";
+import type { EventListItem } from "@/lib/types";
+import { formatEventDate, formatEventPrice } from "@/lib/format";
+import { lookupPostcode } from "@/lib/geocode";
+import {
+  fetchFavouritedEvents,
+  fetchFavouritedVenues,
+  setEventFavourited,
+  setVenueFavourited,
+  fetchBucketSlugToId,
+  fetchNotificationBucketIds,
+  setNotificationBucket,
+  fetchProfileLocation,
+  updateProfileLocation,
+  type FavouriteVenue,
+} from "@/lib/favourites";
 
 interface SidebarItem {
   label: string;
@@ -59,6 +79,13 @@ const MAX_PRICE_CAP = 100;
 const COMMUNITY_BUCKET_ENTRIES = (Object.entries(BUCKET_LABELS) as [BucketSlug, string][]).filter(
   ([slug]) => !NON_QUALIFYING_BUCKETS.includes(slug)
 );
+
+// Notification flags cover cost too ("free events" is an explicit ask) —
+// unlike the Community filter list, nothing is excluded here.
+const ALL_BUCKET_ENTRIES = Object.entries(BUCKET_LABELS) as [BucketSlug, string][];
+
+const DEFAULT_RADIUS_KM = 10;
+const MAX_RADIUS_KM = 50;
 
 type FilterSection = "price" | "category" | "community";
 
@@ -111,6 +138,46 @@ function FilterSectionButton({
   );
 }
 
+interface SectionHeadingProps {
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  isLast?: boolean;
+  onClick?: () => void;
+}
+
+// Group header for Favourites/Settings/Account — same tree connector + icon
+// + text-base label as FilterSectionButton above. Static (a <div>) for
+// group headers that don't collapse (Events, Venues, Notify me about, Home
+// location); becomes a clickable row (a <button>) when onClick is passed,
+// e.g. Account's "Notification settings" jumping to the Settings panel.
+function SectionHeading({ label, icon: Icon, isLast = false, onClick }: SectionHeadingProps) {
+  const content = (
+    <>
+      <span aria-hidden className="select-none text-base leading-none">
+        {isLast ? "└──" : "├──"}
+      </span>
+      <Icon aria-hidden className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+      <span className="text-base flex gap-6">{label}</span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="group flex w-full cursor-pointer items-center gap-2 whitespace-nowrap text-left text-[#1f271a]/55 transition-colors duration-200 hover:text-[#1f271a]"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 whitespace-nowrap text-[#1f271a]/55">{content}</div>
+  );
+}
+
 interface SidebarProps {
   dateFilter: DateFilter;
   onDateFilterChange: (filter: DateFilter) => void;
@@ -140,7 +207,41 @@ export default function Sidebar({
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+
+  // ── Account management (Account panel, signed-in view) ──
+  // Change password/email are real Supabase Auth calls on the active
+  // session (supabase.auth.updateUser), same direct-client pattern used
+  // everywhere else. Delete account has no backend support yet — no
+  // service-role route exists to actually remove an auth.users row — so
+  // it's an honest mock: the confirm step never claims success.
+  const [accountSection, setAccountSection] = useState<"password" | "email" | "delete" | null>(
+    null
+  );
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<string | null>(null);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [hasClaimedOrganiser, setHasClaimedOrganiser] = useState(false);
+
+  // ── Favourites state ──
+  const [favouriteEvents, setFavouriteEvents] = useState<EventListItem[]>([]);
+  const [favouriteVenues, setFavouriteVenues] = useState<FavouriteVenue[]>([]);
+  const [favouritesLoaded, setFavouritesLoaded] = useState(false);
+
+  // ── Settings state (notification flags + home location/radius) ──
+  const [bucketSlugToId, setBucketSlugToId] = useState<Map<BucketSlug, string>>(new Map());
+  const [notificationBucketIds, setNotificationBucketIdsState] = useState<Set<string>>(new Set());
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [homeLabel, setHomeLabel] = useState<string | null>(null);
+  const [homeCoords, setHomeCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [postcodeInput, setPostcodeInput] = useState("");
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
+  const [locationBusy, setLocationBusy] = useState(false);
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -183,6 +284,147 @@ export default function Sidebar({
     })();
   }, [user]);
 
+  // Favourites are fetched lazily, the first time the panel is opened —
+  // avoids the round-trip for the vast majority of page loads where a
+  // signed-in user never opens it.
+  useEffect(() => {
+    if (!user || displayedItem !== "Favourites" || favouritesLoaded) return;
+    (async () => {
+      const [events, venues] = await Promise.all([
+        fetchFavouritedEvents(user.id),
+        fetchFavouritedVenues(user.id),
+      ]);
+      setFavouriteEvents(events);
+      setFavouriteVenues(venues);
+      setFavouritesLoaded(true);
+    })();
+  }, [user, displayedItem, favouritesLoaded]);
+
+  // Clear stale favourites once signed out, so a later sign-in as a
+  // different account can't briefly show the previous user's list.
+  useEffect(() => {
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFavouriteEvents([]);
+      setFavouriteVenues([]);
+      setFavouritesLoaded(false);
+    }
+  }, [user]);
+
+  // Same lazy-load-once-opened pattern for Settings: bucket vocabulary,
+  // this user's notification flags, and their saved home location/radius.
+  useEffect(() => {
+    if (!user || displayedItem !== "Settings" || settingsLoaded) return;
+    (async () => {
+      const [slugMap, bucketIds, location] = await Promise.all([
+        fetchBucketSlugToId(),
+        fetchNotificationBucketIds(user.id),
+        fetchProfileLocation(user.id),
+      ]);
+      setBucketSlugToId(slugMap);
+      setNotificationBucketIdsState(bucketIds);
+      if (location?.home_lat != null && location?.home_lng != null) {
+        setHomeCoords({ lat: location.home_lat, lng: location.home_lng });
+      }
+      setHomeLabel(location?.home_label ?? null);
+      setRadiusKm(location?.travel_radius_km ?? DEFAULT_RADIUS_KM);
+      setSettingsLoaded(true);
+    })();
+  }, [user, displayedItem, settingsLoaded]);
+
+  useEffect(() => {
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNotificationBucketIdsState(new Set());
+      setSettingsLoaded(false);
+      setHomeLabel(null);
+      setHomeCoords(null);
+      setRadiusKm(DEFAULT_RADIUS_KM);
+    }
+  }, [user]);
+
+  async function toggleEventFavourite(event: EventListItem) {
+    if (!user) return;
+    setFavouriteEvents((current) => current.filter((e) => e.id !== event.id));
+    await setEventFavourited(user.id, event.id, false);
+  }
+
+  async function toggleVenueFavourite(venue: FavouriteVenue) {
+    if (!user) return;
+    setFavouriteVenues((current) => current.filter((v) => v.id !== venue.id));
+    await setVenueFavourited(user.id, venue.id, false);
+  }
+
+  async function toggleNotificationBucket(slug: BucketSlug) {
+    if (!user) return;
+    const bucketId = bucketSlugToId.get(slug);
+    if (!bucketId) return;
+    const enabled = notificationBucketIds.has(bucketId);
+    setNotificationBucketIdsState((current) => {
+      const next = new Set(current);
+      if (enabled) next.delete(bucketId);
+      else next.add(bucketId);
+      return next;
+    });
+    await setNotificationBucket(user.id, bucketId, !enabled);
+  }
+
+  async function handleUseMyLocation() {
+    if (!user || !navigator.geolocation) {
+      setLocationStatus("Location isn't available in this browser.");
+      return;
+    }
+    setLocationBusy(true);
+    setLocationStatus(null);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setHomeCoords(coords);
+        setHomeLabel("Current location");
+        await updateProfileLocation(user.id, {
+          home_lat: coords.lat,
+          home_lng: coords.lng,
+          home_label: "Current location",
+          travel_radius_km: radiusKm,
+        });
+        setLocationBusy(false);
+        setLocationStatus("Saved.");
+      },
+      () => {
+        setLocationBusy(false);
+        setLocationStatus("Couldn't get your location — check browser permissions.");
+      }
+    );
+  }
+
+  async function handlePostcodeLookup() {
+    if (!user || !postcodeInput.trim()) return;
+    setLocationBusy(true);
+    setLocationStatus(null);
+    const result = await lookupPostcode(postcodeInput);
+    if (!result) {
+      setLocationBusy(false);
+      setLocationStatus("Postcode not found.");
+      return;
+    }
+    setHomeCoords({ lat: result.lat, lng: result.lng });
+    setHomeLabel(result.label);
+    await updateProfileLocation(user.id, {
+      home_lat: result.lat,
+      home_lng: result.lng,
+      home_label: result.label,
+      travel_radius_km: radiusKm,
+    });
+    setLocationBusy(false);
+    setLocationStatus("Saved.");
+  }
+
+  async function handleRadiusChange(value: number) {
+    setRadiusKm(value);
+    if (!user || !homeCoords) return;
+    await updateProfileLocation(user.id, { travel_radius_km: value });
+  }
+
   async function handleGoogleSignIn() {
     setAuthError(null);
     try {
@@ -224,6 +466,55 @@ export default function Sidebar({
       setActiveItem(null);
     } catch {
       // ignore
+    }
+  }
+
+  function toggleAccountSection(section: "password" | "email" | "delete") {
+    setAccountSection((current) => (current === section ? null : section));
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setPasswordStatus("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus("Passwords don't match.");
+      return;
+    }
+    setPasswordBusy(true);
+    setPasswordStatus(null);
+    try {
+      const supabase = createBrowserClient();
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) setPasswordStatus(error.message);
+      else {
+        setPasswordStatus("Password updated.");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
+    } catch {
+      setPasswordStatus("Couldn't update password right now.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
+  async function handleChangeEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newEmail.trim()) return;
+    setEmailBusy(true);
+    setEmailStatus(null);
+    try {
+      const supabase = createBrowserClient();
+      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+      if (error) setEmailStatus(error.message);
+      else setEmailStatus("Check both your old and new inbox to confirm the change.");
+    } catch {
+      setEmailStatus("Couldn't update email right now.");
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -490,7 +781,7 @@ export default function Sidebar({
                 <div className="flex flex-col gap-4 normal-case tracking-normal">
                   {user ? (
                     /* ── Signed-in view ── */
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-5">
                       <div className="flex items-center gap-3">
                         {user.user_metadata?.avatar_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -507,6 +798,137 @@ export default function Sidebar({
                           <p className="truncate text-xs text-[#1f271a]/50">{user.email}</p>
                         </div>
                       </div>
+
+                      <div className="flex flex-col gap-3 text-sm normal-case tracking-normal">
+                        <SectionHeading
+                          label="Notification settings"
+                          icon={NotificationsIcon}
+                          onClick={() => openItem("Settings")}
+                        />
+
+                        <div>
+                          <FilterSectionButton
+                            label="Change password"
+                            icon={LockIcon}
+                            isLast={false}
+                            isOpen={accountSection === "password"}
+                            badge={null}
+                            onClick={() => toggleAccountSection("password")}
+                          />
+                          {accountSection === "password" && (
+                            <form
+                              onSubmit={handleChangePassword}
+                              className="mt-3 flex flex-col gap-2 pl-9"
+                            >
+                              <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="New password"
+                                required
+                                className="rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                              />
+                              <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Confirm new password"
+                                required
+                                className="rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                              />
+                              {passwordStatus && (
+                                <p className="text-xs text-[#1f271a]/60">{passwordStatus}</p>
+                              )}
+                              <button
+                                type="submit"
+                                disabled={passwordBusy}
+                                className="self-start rounded-lg bg-[#1f271a] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                              >
+                                {passwordBusy ? "…" : "Update password"}
+                              </button>
+                            </form>
+                          )}
+                        </div>
+
+                        <div>
+                          <FilterSectionButton
+                            label="Change email"
+                            icon={MailIcon}
+                            isLast={false}
+                            isOpen={accountSection === "email"}
+                            badge={null}
+                            onClick={() => toggleAccountSection("email")}
+                          />
+                          {accountSection === "email" && (
+                            <form
+                              onSubmit={handleChangeEmail}
+                              className="mt-3 flex flex-col gap-2 pl-9"
+                            >
+                              <input
+                                type="email"
+                                value={newEmail}
+                                onChange={(e) => setNewEmail(e.target.value)}
+                                placeholder="New email address"
+                                required
+                                className="rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                              />
+                              {emailStatus && (
+                                <p className="text-xs text-[#1f271a]/60">{emailStatus}</p>
+                              )}
+                              <button
+                                type="submit"
+                                disabled={emailBusy}
+                                className="self-start rounded-lg bg-[#1f271a] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                              >
+                                {emailBusy ? "…" : "Update email"}
+                              </button>
+                            </form>
+                          )}
+                        </div>
+
+                        <div>
+                          <FilterSectionButton
+                            label="Delete account"
+                            icon={TrashIcon}
+                            isLast={true}
+                            isOpen={accountSection === "delete"}
+                            badge={null}
+                            onClick={() => toggleAccountSection("delete")}
+                          />
+                          {accountSection === "delete" && (
+                            <div className="mt-3 flex flex-col gap-2 pl-9">
+                              <p className="text-xs text-[#1f271a]/60">
+                                Account deletion isn&apos;t available yet — this would
+                                permanently remove your profile, favourites, and claims. Email
+                                support to request it in the meantime.
+                              </p>
+                              {!deleteConfirming ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirming(true)}
+                                  className="self-start rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                                >
+                                  Delete my account
+                                </button>
+                              ) : (
+                                <div className="flex flex-col gap-2">
+                                  <p className="text-xs font-medium text-red-600">
+                                    Not wired up yet — no action was taken.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteConfirming(false)}
+                                    className="self-start text-xs text-[#1f271a]/60 underline underline-offset-4"
+                                  >
+                                    Dismiss
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleSignOut}
@@ -588,11 +1010,199 @@ export default function Sidebar({
                 </div>
               )}
 
-              {displayedItem && displayedItem !== "Filter" && displayedItem !== "Account" && (
-                <p className="text-sm normal-case tracking-normal text-[#1f271a]/60">
-                  Coming soon.
-                </p>
+              {displayedItem === "Favourites" && (
+                <div className="flex flex-col gap-5 normal-case tracking-normal">
+                  {!user ? (
+                    <p className="text-sm text-[#1f271a]/50">
+                      Sign in to save events and venues.
+                    </p>
+                  ) : !favouritesLoaded ? (
+                    <p className="text-sm text-[#1f271a]/50">Loading…</p>
+                  ) : favouriteEvents.length === 0 && favouriteVenues.length === 0 ? (
+                    <p className="text-sm text-[#1f271a]/50">
+                      Nothing favourited yet — tap the heart on an event or venue.
+                    </p>
+                  ) : (
+                    <>
+                      {favouriteEvents.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <SectionHeading
+                            label="Events"
+                            icon={CalendarIcon}
+                            isLast={favouriteVenues.length === 0}
+                          />
+                          {favouriteEvents.map((event) => {
+                            const meta = [
+                              formatEventDate(event.start_at),
+                              event.venues?.name ?? null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ");
+                            const price = formatEventPrice(event);
+                            return (
+                              <div
+                                key={event.id}
+                                className="flex items-start gap-2 rounded-lg border border-[#1f271a]/10 px-3 py-2 text-sm"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  {event.source_url ? (
+                                    <a
+                                      href={event.source_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="truncate font-medium text-[#1f271a] hover:underline"
+                                    >
+                                      {event.title}
+                                    </a>
+                                  ) : (
+                                    <p className="truncate font-medium text-[#1f271a]">{event.title}</p>
+                                  )}
+                                  <p className="truncate text-xs text-[#1f271a]/50">
+                                    {meta}
+                                    {price ? ` · ${price}` : ""}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  aria-label="Remove from favourites"
+                                  onClick={() => toggleEventFavourite(event)}
+                                  className="shrink-0 text-[#1f271a]/40 hover:text-[#1f271a]"
+                                >
+                                  <FavouritesIcon className="h-4 w-4" fill="currentColor" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {favouriteVenues.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <SectionHeading label="Venues" icon={LocationPinIcon} isLast />
+                          {favouriteVenues.map((venue) => (
+                            <div
+                              key={venue.id}
+                              className="flex items-start gap-2 rounded-lg border border-[#1f271a]/10 px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-[#1f271a]">{venue.name}</p>
+                                {venue.city && (
+                                  <p className="truncate text-xs text-[#1f271a]/50">{venue.city}</p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                aria-label="Remove from favourites"
+                                onClick={() => toggleVenueFavourite(venue)}
+                                className="shrink-0 text-[#1f271a]/40 hover:text-[#1f271a]"
+                              >
+                                <FavouritesIcon className="h-4 w-4" fill="currentColor" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
+
+              {displayedItem === "Settings" && (
+                <div className="flex flex-col gap-6 normal-case tracking-normal">
+                  {!user ? (
+                    <p className="text-sm text-[#1f271a]/50">
+                      Sign in to set notification flags and a home location.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <SectionHeading label="Notify me about" icon={NotificationsIcon} />
+                        <div className="flex flex-col gap-1.5">
+                          {ALL_BUCKET_ENTRIES.map(([slug, bucketLabel]) => {
+                            const bucketId = bucketSlugToId.get(slug);
+                            const checked = !!bucketId && notificationBucketIds.has(bucketId);
+                            return (
+                              <label key={slug} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={!bucketId}
+                                  onChange={() => toggleNotificationBucket(slug)}
+                                />
+                                {bucketLabel}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <SectionHeading label="Home location" icon={LocationPinIcon} isLast />
+                        <p className="text-sm text-[#1f271a]/70">
+                          {homeLabel ?? "Not set"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleUseMyLocation}
+                          disabled={locationBusy}
+                          className="self-start text-xs underline underline-offset-4 disabled:opacity-50"
+                        >
+                          Use my current location
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={postcodeInput}
+                            onChange={(e) => setPostcodeInput(e.target.value)}
+                            placeholder="Postcode"
+                            className="min-w-0 flex-1 rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={handlePostcodeLookup}
+                            disabled={locationBusy || !postcodeInput.trim()}
+                            className="shrink-0 rounded-lg border border-[#1f271a]/20 px-3 py-2 text-xs font-medium disabled:opacity-50"
+                          >
+                            Set
+                          </button>
+                        </div>
+                        {locationStatus && (
+                          <p className="text-xs text-[#1f271a]/50">{locationStatus}</p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#1f271a]/40">
+                          Travel radius
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            aria-label="Travel radius"
+                            min={1}
+                            max={MAX_RADIUS_KM}
+                            step={1}
+                            value={radiusKm}
+                            onChange={(e) => handleRadiusChange(Number(e.target.value))}
+                            className="w-full"
+                          />
+                          <span className="whitespace-nowrap text-xs">{radiusKm} km</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {displayedItem &&
+                displayedItem !== "Filter" &&
+                displayedItem !== "Account" &&
+                displayedItem !== "Favourites" &&
+                displayedItem !== "Settings" && (
+                  <p className="text-sm normal-case tracking-normal text-[#1f271a]/60">
+                    Coming soon.
+                  </p>
+                )}
             </div>
           </div>
         </div>

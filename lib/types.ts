@@ -53,6 +53,7 @@ export interface EventListItem {
   source_url: string | null;
   image_url: string | null;
   venues: {
+    id: string;
     name: string;
     city: string | null;
     region: string | null;

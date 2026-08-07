@@ -1,12 +1,22 @@
 import type { EventListItem } from "@/lib/types";
 import { formatEventDate, formatEventPrice } from "@/lib/format";
+import FavouriteButton from "@/app/components/FavouriteButton";
 
 interface CardsViewProps {
   events: EventListItem[];
   error: string | null;
+  signedIn: boolean;
+  favouriteEventIds: Set<string>;
+  onToggleEventFavourite: (eventId: string) => void;
 }
 
-export default function CardsView({ events, error }: CardsViewProps) {
+export default function CardsView({
+  events,
+  error,
+  signedIn,
+  favouriteEventIds,
+  onToggleEventFavourite,
+}: CardsViewProps) {
   if (error) {
     return (
       <div className="px-6 py-16">
@@ -37,7 +47,18 @@ export default function CardsView({ events, error }: CardsViewProps) {
         const price = formatEventPrice(event);
         const card = (
           <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-900">
+            <div className="relative aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-900">
+              {signedIn && (
+                <FavouriteButton
+                  favourited={favouriteEventIds.has(event.id)}
+                  onToggle={() => onToggleEventFavourite(event.id)}
+                  label={
+                    favouriteEventIds.has(event.id) ? "Remove from favourites" : "Add to favourites"
+                  }
+                  itemName={event.title}
+                  className="absolute right-2 top-2 z-10 h-6 w-6 text-white drop-shadow"
+                />
+              )}
               {event.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element -- external, unoptimized Skiddle-hosted images
                 <img

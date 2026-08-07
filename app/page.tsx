@@ -30,7 +30,7 @@ export default async function Home() {
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, description, start_at, end_at, category, is_free, price_min, currency, source_url, image_url, venues(name, city, region, lat, lng), event_buckets!inner(confidence, assigned_by, buckets(slug, label))"
+      "id, title, description, start_at, end_at, category, is_free, price_min, currency, source_url, image_url, venues(id, name, city, region, lat, lng), event_buckets!inner(confidence, assigned_by, buckets(slug, label))"
     )
     .eq("status", "published")
     .eq("is_duplicate", false)

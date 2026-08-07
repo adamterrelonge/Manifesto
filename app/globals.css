@@ -170,6 +170,18 @@ body {
   }
 }
 
+@keyframes sidebar-pin-bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+
 @keyframes sidebar-arrow-top {
 
   0%,
@@ -236,4 +248,93 @@ body {
   100% {
     transform: translateX(0px);
   }
+}
+
+/* Favourite-toggle burst + pill (FavouriteButton.tsx) — JS-triggered via
+   conditional class, not group-hover, so each gets its own utility class
+   rather than the [animation:...] arbitrary syntax used for sidebar icons. */
+
+@keyframes fav-heart-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.4);
+  }
+
+  65% {
+    transform: scale(0.9);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-fav-heart-pop {
+  animation: fav-heart-pop 0.45s ease-out;
+}
+
+@keyframes fav-burst-ring {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-fav-burst-ring {
+  animation: fav-burst-ring 0.55s ease-out forwards;
+}
+
+@keyframes fav-burst-particle {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--fav-particle-angle)) translateY(0) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--fav-particle-angle)) translateY(-14px) scale(0);
+    opacity: 0;
+  }
+}
+
+.animate-fav-burst-particle {
+  animation: fav-burst-particle 0.5s ease-out forwards;
+}
+
+@keyframes fav-pill-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scaleX(0.6);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scaleX(1);
+  }
+}
+
+.animate-fav-pill-in {
+  transform-origin: left center;
+  animation: fav-pill-in 0.28s ease-out forwards;
+}
+
+@keyframes fav-pill-out {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-fav-pill-out {
+  animation: fav-pill-out 0.35s ease-in forwards;
 }
