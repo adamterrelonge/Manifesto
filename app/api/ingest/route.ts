@@ -10,6 +10,7 @@ import {
   runQualityScoring,
   runPrune,
 } from "@/lib/pipeline";
+import { runNotificationDelivery } from "@/lib/notifications";
 import { fetchBarbicanEvents, normaliseBarbicanEvent } from "@/lib/sources/barbican";
 import {
   fetchAllEventbriteEvents,
@@ -898,6 +899,17 @@ export async function GET(request: NextRequest) {
     prune = { error: (err as Error).message };
   }
 
+  // Last: matches this run's newly-published events against saved
+  // bucket/radius preferences and emails digests — must run after
+  // classify (buckets need to exist to match against) and after prune
+  // (no point notifying about an event this same run just deleted).
+  let notify: Awaited<ReturnType<typeof runNotificationDelivery>> | { error: string };
+  try {
+    notify = await runNotificationDelivery(admin);
+  } catch (err) {
+    notify = { error: (err as Error).message };
+  }
+
   return NextResponse.json({
     sources: {
       barbican,
@@ -945,5 +957,6 @@ export async function GET(request: NextRequest) {
     categoryInference,
     quality,
     prune,
+    notify,
   });
 }

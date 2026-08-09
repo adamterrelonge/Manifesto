@@ -63,6 +63,7 @@ export interface EventListItem {
   event_buckets: {
     confidence: number;
     assigned_by: string;
+    bucket_id: string;
     buckets: { slug: string; label: string } | null;
   }[];
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { ComponentType, SVGProps } from "react";
+import { track } from "@vercel/analytics";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import {
   FilterIcon,
@@ -39,6 +40,7 @@ import {
   updateProfileLocation,
   type FavouriteVenue,
 } from "@/lib/favourites";
+import { fetchIsTrustedModerator } from "@/lib/moderation";
 
 interface SidebarItem {
   label: string;
@@ -64,13 +66,26 @@ export interface FilterState {
   maxPrice: number | null; // null = no limit
   categories: Category[]; // empty = all
   buckets: BucketSlug[]; // empty = all
+  nearMeOnly: boolean; // requires homeLocation to have any effect — see matchesFilters in AppShell.tsx
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   maxPrice: null,
   categories: [],
   buckets: [],
+  nearMeOnly: false,
 };
+
+// The resolved (lat/lng/radius) triple AppShell filters events against —
+// owned by AppShell (fetched on login, same as favourites) so the Filter
+// panel's "near me" toggle works immediately without requiring a visit to
+// Settings first. Settings still owns editing it; it reports changes back
+// up via onHomeLocationChange so both copies stay in sync.
+export interface HomeLocation {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}
 
 const MAX_PRICE_CAP = 100;
 
@@ -87,7 +102,8 @@ const ALL_BUCKET_ENTRIES = Object.entries(BUCKET_LABELS) as [BucketSlug, string]
 const DEFAULT_RADIUS_KM = 10;
 const MAX_RADIUS_KM = 50;
 
-type FilterSection = "price" | "category" | "community";
+type FilterSection = "price" | "category" | "community" | "location";
+type SettingsSection = "location" | "notify";
 
 interface FilterSectionButtonProps {
   label: string;
@@ -183,6 +199,8 @@ interface SidebarProps {
   onDateFilterChange: (filter: DateFilter) => void;
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
+  homeLocation: HomeLocation | null;
+  onHomeLocationChange: (location: HomeLocation | null) => void;
 }
 
 export default function Sidebar({
@@ -190,6 +208,8 @@ export default function Sidebar({
   onDateFilterChange,
   filters,
   onFiltersChange,
+  homeLocation,
+  onHomeLocationChange,
 }: SidebarProps) {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   // Drives which detail content is rendered — deliberately NOT cleared when
@@ -199,6 +219,7 @@ export default function Sidebar({
   // sliding away rather than the options disappearing.
   const [displayedItem, setDisplayedItem] = useState<string | null>(null);
   const [openFilterSection, setOpenFilterSection] = useState<FilterSection | null>(null);
+  const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection | null>(null);
 
   // ── Auth state ──
   const [user, setUser] = useState<User | null>(null);
@@ -226,6 +247,7 @@ export default function Sidebar({
   const [emailBusy, setEmailBusy] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [hasClaimedOrganiser, setHasClaimedOrganiser] = useState(false);
+  const [isTrustedModerator, setIsTrustedModerator] = useState(false);
 
   // ── Favourites state ──
   const [favouriteEvents, setFavouriteEvents] = useState<EventListItem[]>([]);
@@ -284,6 +306,20 @@ export default function Sidebar({
     })();
   }, [user]);
 
+  // Same "only show it if it applies" reasoning as "Manage your listing"
+  // above — most signed-in users are never granted moderator trust
+  // (docs/PROJECT_PLAN.md §13, Tier 1), so the link stays hidden for them.
+  useEffect(() => {
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsTrustedModerator(false);
+      return;
+    }
+    fetchIsTrustedModerator(user.id)
+      .then(setIsTrustedModerator)
+      .catch(() => setIsTrustedModerator(false));
+  }, [user]);
+
   // Favourites are fetched lazily, the first time the panel is opened —
   // avoids the round-trip for the vast majority of page loads where a
   // signed-in user never opens it.
@@ -323,14 +359,23 @@ export default function Sidebar({
       ]);
       setBucketSlugToId(slugMap);
       setNotificationBucketIdsState(bucketIds);
+      const resolvedRadiusKm = location?.travel_radius_km ?? DEFAULT_RADIUS_KM;
       if (location?.home_lat != null && location?.home_lng != null) {
         setHomeCoords({ lat: location.home_lat, lng: location.home_lng });
       }
       setHomeLabel(location?.home_label ?? null);
-      setRadiusKm(location?.travel_radius_km ?? DEFAULT_RADIUS_KM);
+      setRadiusKm(resolvedRadiusKm);
       setSettingsLoaded(true);
+      // AppShell already fetched this on login for the Filter panel's "near
+      // me" toggle — re-report it here too in case that fetch hasn't landed
+      // yet, so Settings and the Filter panel never disagree.
+      onHomeLocationChange(
+        location?.home_lat != null && location?.home_lng != null
+          ? { lat: location.home_lat, lng: location.home_lng, radiusKm: resolvedRadiusKm }
+          : null
+      );
     })();
-  }, [user, displayedItem, settingsLoaded]);
+  }, [user, displayedItem, settingsLoaded, onHomeLocationChange]);
 
   useEffect(() => {
     if (!user) {
@@ -340,8 +385,9 @@ export default function Sidebar({
       setHomeLabel(null);
       setHomeCoords(null);
       setRadiusKm(DEFAULT_RADIUS_KM);
+      onHomeLocationChange(null);
     }
-  }, [user]);
+  }, [user, onHomeLocationChange]);
 
   async function toggleEventFavourite(event: EventListItem) {
     if (!user) return;
@@ -387,6 +433,7 @@ export default function Sidebar({
           home_label: "Current location",
           travel_radius_km: radiusKm,
         });
+        onHomeLocationChange({ lat: coords.lat, lng: coords.lng, radiusKm });
         setLocationBusy(false);
         setLocationStatus("Saved.");
       },
@@ -415,6 +462,7 @@ export default function Sidebar({
       home_label: result.label,
       travel_radius_km: radiusKm,
     });
+    onHomeLocationChange({ lat: result.lat, lng: result.lng, radiusKm });
     setLocationBusy(false);
     setLocationStatus("Saved.");
   }
@@ -423,6 +471,7 @@ export default function Sidebar({
     setRadiusKm(value);
     if (!user || !homeCoords) return;
     await updateProfileLocation(user.id, { travel_radius_km: value });
+    onHomeLocationChange({ lat: homeCoords.lat, lng: homeCoords.lng, radiusKm: value });
   }
 
   async function handleGoogleSignIn() {
@@ -535,9 +584,15 @@ export default function Sidebar({
     openFilterSection !== "community" && filters.buckets.length > 0
       ? String(filters.buckets.length)
       : null;
+  const locationBadge =
+    openFilterSection !== "location" && filters.nearMeOnly ? "On" : null;
 
   function toggleFilterSection(section: FilterSection) {
     setOpenFilterSection((current) => (current === section ? null : section));
+  }
+
+  function toggleSettingsSection(section: SettingsSection) {
+    setOpenSettingsSection((current) => (current === section ? null : section));
   }
 
   const avatarLetter =
@@ -640,6 +695,9 @@ export default function Sidebar({
           </nav>
 
           <div className="mt-8 flex flex-col gap-2 text-xs text-[#1f271a]/40">
+            <a href="/events" className="transition-colors duration-200 hover:text-[#1f271a]">
+              Browse by city
+            </a>
             <a href="/submit" className="transition-colors duration-200 hover:text-[#1f271a]">
               Submit an event
             </a>
@@ -649,6 +707,11 @@ export default function Sidebar({
             {hasClaimedOrganiser && (
               <a href="/organiser/manage" className="transition-colors duration-200 hover:text-[#1f271a]">
                 Manage your listing
+              </a>
+            )}
+            {isTrustedModerator && (
+              <a href="/moderate" className="transition-colors duration-200 hover:text-[#1f271a]">
+                Community moderation
               </a>
             )}
           </div>
@@ -737,7 +800,7 @@ export default function Sidebar({
                     <FilterSectionButton
                       label="Community"
                       icon={CommunityIcon}
-                      isLast={true}
+                      isLast={false}
                       isOpen={openFilterSection === "community"}
                       badge={communityBadge}
                       onClick={() => toggleFilterSection("community")}
@@ -750,10 +813,19 @@ export default function Sidebar({
                               type="checkbox"
                               checked={filters.buckets.includes(slug)}
                               onChange={() => {
-                                const next = filters.buckets.includes(slug)
-                                  ? filters.buckets.filter((b) => b !== slug)
-                                  : [...filters.buckets, slug];
+                                const enabling = !filters.buckets.includes(slug);
+                                const next = enabling
+                                  ? [...filters.buckets, slug]
+                                  : filters.buckets.filter((b) => b !== slug);
                                 onFiltersChange({ ...filters, buckets: next });
+                                // Page-view analytics (Analytics component in
+                                // app/layout.tsx) already covers "which
+                                // areas get engagement" via per-city/region
+                                // URLs — bucket filtering has no URL of its
+                                // own, so it needs an explicit custom event
+                                // to answer the other half of docs/PROJECT_PLAN.md
+                                // Phase 6's "which buckets ... get engagement" goal.
+                                track("bucket_filter", { bucket: slug, enabled: enabling });
                               }}
                             />
                             {bucketLabel}
@@ -763,9 +835,43 @@ export default function Sidebar({
                     )}
                   </div>
 
+                  <div>
+                    <FilterSectionButton
+                      label="Location"
+                      icon={LocationPinIcon}
+                      isLast={true}
+                      isOpen={openFilterSection === "location"}
+                      badge={locationBadge}
+                      onClick={() => toggleFilterSection("location")}
+                    />
+                    {openFilterSection === "location" && (
+                      <div className="mt-3 flex flex-col gap-2 pl-9">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={filters.nearMeOnly}
+                            disabled={!homeLocation}
+                            onChange={() =>
+                              onFiltersChange({ ...filters, nearMeOnly: !filters.nearMeOnly })
+                            }
+                          />
+                          {homeLocation
+                            ? `Only within ${homeLocation.radiusKm} km of home`
+                            : "Only within my travel radius"}
+                        </label>
+                        {!homeLocation && (
+                          <p className="text-xs text-[#1f271a]/50">
+                            Set your home location in Settings to use this filter.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {(filters.maxPrice !== null ||
                     filters.categories.length > 0 ||
-                    filters.buckets.length > 0) && (
+                    filters.buckets.length > 0 ||
+                    filters.nearMeOnly) && (
                     <button
                       type="button"
                       onClick={() => onFiltersChange(DEFAULT_FILTERS)}
@@ -1108,86 +1214,108 @@ export default function Sidebar({
               )}
 
               {displayedItem === "Settings" && (
-                <div className="flex flex-col gap-6 normal-case tracking-normal">
+                <div className="flex flex-col gap-4 normal-case tracking-normal">
                   {!user ? (
                     <p className="text-sm text-[#1f271a]/50">
                       Sign in to set notification flags and a home location.
                     </p>
                   ) : (
                     <>
-                      <div className="flex flex-col gap-2">
-                        <SectionHeading label="Notify me about" icon={NotificationsIcon} />
-                        <div className="flex flex-col gap-1.5">
-                          {ALL_BUCKET_ENTRIES.map(([slug, bucketLabel]) => {
-                            const bucketId = bucketSlugToId.get(slug);
-                            const checked = !!bucketId && notificationBucketIds.has(bucketId);
-                            return (
-                              <label key={slug} className="flex items-center gap-2 text-sm">
+                      <div>
+                        <FilterSectionButton
+                          label="Home location"
+                          icon={LocationPinIcon}
+                          isLast={false}
+                          isOpen={openSettingsSection === "location"}
+                          badge={null}
+                          onClick={() => toggleSettingsSection("location")}
+                        />
+                        {openSettingsSection === "location" && (
+                          <div className="mt-3 flex flex-col gap-4 pl-9">
+                            <div className="flex flex-col gap-2">
+                              <p className="text-sm text-[#1f271a]/70">
+                                {homeLabel ?? "Not set"}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={handleUseMyLocation}
+                                disabled={locationBusy}
+                                className="self-start text-xs underline underline-offset-4 disabled:opacity-50"
+                              >
+                                Use my current location
+                              </button>
+                              <div className="flex items-center gap-2">
                                 <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={!bucketId}
-                                  onChange={() => toggleNotificationBucket(slug)}
+                                  type="text"
+                                  value={postcodeInput}
+                                  onChange={(e) => setPostcodeInput(e.target.value)}
+                                  placeholder="Postcode"
+                                  className="min-w-0 flex-1 rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
                                 />
-                                {bucketLabel}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
+                                <button
+                                  type="button"
+                                  onClick={handlePostcodeLookup}
+                                  disabled={locationBusy || !postcodeInput.trim()}
+                                  className="shrink-0 rounded-lg border border-[#1f271a]/20 px-3 py-2 text-xs font-medium disabled:opacity-50"
+                                >
+                                  Set
+                                </button>
+                              </div>
+                              {locationStatus && (
+                                <p className="text-xs text-[#1f271a]/50">{locationStatus}</p>
+                              )}
+                            </div>
 
-                      <div className="flex flex-col gap-2">
-                        <SectionHeading label="Home location" icon={LocationPinIcon} isLast />
-                        <p className="text-sm text-[#1f271a]/70">
-                          {homeLabel ?? "Not set"}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleUseMyLocation}
-                          disabled={locationBusy}
-                          className="self-start text-xs underline underline-offset-4 disabled:opacity-50"
-                        >
-                          Use my current location
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={postcodeInput}
-                            onChange={(e) => setPostcodeInput(e.target.value)}
-                            placeholder="Postcode"
-                            className="min-w-0 flex-1 rounded-lg border border-[#1f271a]/15 bg-transparent px-3 py-2 text-sm placeholder:text-[#1f271a]/30 focus:outline-none focus:ring-1 focus:ring-[#1f271a]/30"
-                          />
-                          <button
-                            type="button"
-                            onClick={handlePostcodeLookup}
-                            disabled={locationBusy || !postcodeInput.trim()}
-                            className="shrink-0 rounded-lg border border-[#1f271a]/20 px-3 py-2 text-xs font-medium disabled:opacity-50"
-                          >
-                            Set
-                          </button>
-                        </div>
-                        {locationStatus && (
-                          <p className="text-xs text-[#1f271a]/50">{locationStatus}</p>
+                            <div className="flex flex-col gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-[#1f271a]/40">
+                                Travel radius
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="range"
+                                  aria-label="Travel radius"
+                                  min={1}
+                                  max={MAX_RADIUS_KM}
+                                  step={1}
+                                  value={radiusKm}
+                                  onChange={(e) => handleRadiusChange(Number(e.target.value))}
+                                  className="w-full"
+                                />
+                                <span className="whitespace-nowrap text-xs">{radiusKm} km</span>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#1f271a]/40">
-                          Travel radius
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="range"
-                            aria-label="Travel radius"
-                            min={1}
-                            max={MAX_RADIUS_KM}
-                            step={1}
-                            value={radiusKm}
-                            onChange={(e) => handleRadiusChange(Number(e.target.value))}
-                            className="w-full"
-                          />
-                          <span className="whitespace-nowrap text-xs">{radiusKm} km</span>
-                        </div>
+                      <div>
+                        <FilterSectionButton
+                          label="Notify me about"
+                          icon={NotificationsIcon}
+                          isLast={true}
+                          isOpen={openSettingsSection === "notify"}
+                          badge={null}
+                          onClick={() => toggleSettingsSection("notify")}
+                        />
+                        {openSettingsSection === "notify" && (
+                          <div className="mt-3 flex flex-col gap-1.5 pl-9">
+                            {ALL_BUCKET_ENTRIES.map(([slug, bucketLabel]) => {
+                              const bucketId = bucketSlugToId.get(slug);
+                              const checked = !!bucketId && notificationBucketIds.has(bucketId);
+                              return (
+                                <label key={slug} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={!bucketId}
+                                    onChange={() => toggleNotificationBucket(slug)}
+                                  />
+                                  {bucketLabel}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </>
                   )}

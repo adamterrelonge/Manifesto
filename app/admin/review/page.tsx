@@ -74,6 +74,8 @@ export default function AdminReviewPage() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moderatorEmail, setModeratorEmail] = useState("");
+  const [moderatorStatus, setModeratorStatus] = useState<string | null>(null);
 
   const fetchRows = useCallback(async (currentSecret: string) => {
     setLoading(true);
@@ -154,6 +156,26 @@ export default function AdminReviewPage() {
     }
   }
 
+  async function setModeratorTrust(trusted: boolean) {
+    if (!secret || !moderatorEmail.trim()) return;
+    setModeratorStatus(null);
+    try {
+      const res = await fetch("/api/admin/moderators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ email: moderatorEmail.trim(), trusted }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setModeratorStatus(
+        res.ok
+          ? `${trusted ? "Granted" : "Revoked"} trusted-moderator status for ${moderatorEmail.trim()}.`
+          : ((body as { error?: string }).error ?? "Failed.")
+      );
+    } catch (err) {
+      setModeratorStatus((err as Error).message);
+    }
+  }
+
   if (!secret) {
     return (
       <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-24">
@@ -212,6 +234,42 @@ export default function AdminReviewPage() {
         confirm every occurrence at once. Sorted lowest confidence first; below{" "}
         {HIGH_CONFIDENCE_THRESHOLD * 100}% is worth checking.
       </p>
+
+      <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+        <p className="text-sm font-medium text-black dark:text-zinc-50">
+          Grant/revoke community moderator trust
+        </p>
+        <p className="text-xs text-zinc-500">
+          Trusted users get access to the community flag queue at{" "}
+          <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800">/moderate</code>.
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="email"
+            value={moderatorEmail}
+            onChange={(e) => setModeratorEmail(e.target.value)}
+            placeholder="user@example.com"
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+          <button
+            type="button"
+            onClick={() => setModeratorTrust(true)}
+            disabled={!moderatorEmail.trim()}
+            className="shrink-0 rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700"
+          >
+            Grant
+          </button>
+          <button
+            type="button"
+            onClick={() => setModeratorTrust(false)}
+            disabled={!moderatorEmail.trim()}
+            className="shrink-0 rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-40 dark:border-red-900 dark:text-red-400"
+          >
+            Revoke
+          </button>
+        </div>
+        {moderatorStatus && <p className="text-xs text-zinc-500">{moderatorStatus}</p>}
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-zinc-500">Loading…</p>}
