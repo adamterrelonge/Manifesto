@@ -12,16 +12,30 @@ interface EventsListViewProps {
   favouriteVenueIds: Set<string>;
   onToggleEventFavourite: (eventId: string) => void;
   onToggleVenueFavourite: (venueId: string) => void;
+  flaggedBucketKeys: Set<string>;
+  onFlagBucket: (eventId: string, bucketId: string) => void;
+}
+
+interface BucketChipEntry {
+  bucketId: string;
+  label: string;
 }
 
 // Community bucket labels come straight off the event_buckets join (each
 // row already carries buckets.label) — no need to re-derive from
 // lib/buckets, and it keeps this view decoupled from the classifier.
-function bucketChips(event: EventListItem): string[] {
-  const labels = event.event_buckets
-    .map((eb) => eb.buckets?.label)
-    .filter((label): label is string => Boolean(label));
-  return Array.from(new Set(labels)).slice(0, 2);
+// bucket_id is kept (not collapsed to a plain label string) so each chip
+// can carry its own "report this tag" control — see docs/PROJECT_PLAN.md
+// §13's report/flag pipeline.
+function bucketChipEntries(event: EventListItem): BucketChipEntry[] {
+  const seen = new Set<string>();
+  const entries: BucketChipEntry[] = [];
+  for (const eb of event.event_buckets) {
+    if (!eb.buckets || eb.assigned_by === "rejected" || seen.has(eb.bucket_id)) continue;
+    seen.add(eb.bucket_id);
+    entries.push({ bucketId: eb.bucket_id, label: eb.buckets.label });
+  }
+  return entries.slice(0, 2);
 }
 
 export default function EventsListView({
@@ -32,6 +46,8 @@ export default function EventsListView({
   favouriteVenueIds,
   onToggleEventFavourite,
   onToggleVenueFavourite,
+  flaggedBucketKeys,
+  onFlagBucket,
 }: EventsListViewProps) {
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6">
@@ -55,9 +71,8 @@ export default function EventsListView({
         <ul className="flex flex-col gap-3">
           {events.map((event) => {
             const price = formatEventPrice(event);
-            const chips = [categoryLabel(event.category), ...bucketChips(event)].filter(
-              (chip): chip is string => Boolean(chip)
-            );
+            const category = categoryLabel(event.category);
+            const bucketEntries = bucketChipEntries(event);
             const venueLabel = event.venues
               ? `${event.venues.name}${event.venues.city ? `, ${event.venues.city}` : ""}`
               : null;
@@ -121,16 +136,49 @@ export default function EventsListView({
                     </div>
                   )}
 
-                  {chips.length > 0 && (
+                  {(category || bucketEntries.length > 0) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {chips.map((chip) => (
-                        <span
-                          key={chip}
-                          className="rounded-full bg-[#1f271a]/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#1f271a]/80 dark:bg-white/10 dark:text-zinc-300"
-                        >
-                          {chip}
+                      {category && (
+                        <span className="rounded-full bg-[#1f271a]/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#1f271a]/80 dark:bg-white/10 dark:text-zinc-300">
+                          {category}
                         </span>
-                      ))}
+                      )}
+                      {bucketEntries.map(({ bucketId, label }) => {
+                        const flagged = flaggedBucketKeys.has(`${event.id}:${bucketId}`);
+                        return (
+                          <span
+                            key={bucketId}
+                            className="inline-flex items-center gap-1 rounded-full bg-[#1f271a]/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#1f271a]/80 dark:bg-white/10 dark:text-zinc-300"
+                          >
+                            {label}
+                            {signedIn && (
+                              <button
+                                type="button"
+                                aria-label={
+                                  flagged
+                                    ? `Reported "${label}" as wrong for this event`
+                                    : `Report "${label}" as wrong for this event`
+                                }
+                                aria-pressed={flagged}
+                                disabled={flagged}
+                                title={flagged ? "Reported" : "Report tag as wrong"}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!flagged) onFlagBucket(event.id, bucketId);
+                                }}
+                                className={
+                                  flagged
+                                    ? "leading-none text-green-600 dark:text-green-400"
+                                    : "leading-none text-[#1f271a]/40 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400"
+                                }
+                              >
+                                {flagged ? "✓" : "⚑"}
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

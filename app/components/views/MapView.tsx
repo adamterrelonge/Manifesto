@@ -1,17 +1,33 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
-  Marker,
   Popup,
   NavigationControl,
   LngLatBounds,
+  setWorkerUrl,
   type StyleSpecification,
+  type GeoJSONSource,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { EventListItem } from "@/lib/types";
 import { formatEventDate, formatEventPrice } from "@/lib/format";
+
+// maplibre-gl's clustering (GeoJSON source with cluster:true) runs
+// supercluster in a Web Worker. Its default worker-URL resolution derives
+// from `import.meta.url` and requires that to be an absolute http(s) URL —
+// under Turbopack's bundling it isn't, so the worker URL silently resolves
+// to "" and clustering never initializes (confirmed via devtools: source
+// stayed permanently unloaded, 0 rendered features, no console error at
+// all — this is a bundler quirk, not a thrown exception). Pointing at a
+// plain static copy of the worker bundle sidesteps that resolution path
+// entirely. The worker bundle itself dynamically imports a "shared" chunk
+// relative to its own URL, so both files have to be copied to public/ and
+// kept side by side. Re-copy public/maplibre-gl-worker.mjs AND
+// public/maplibre-gl-shared.mjs from node_modules/maplibre-gl/dist/ if
+// maplibre-gl is ever upgraded.
+setWorkerUrl("/maplibre-gl-worker.mjs");
 
 // Same path data as app/components/icons.tsx's FavouritesIcon — duplicated
 // as a plain constant (not imported) because the popup below is built with
@@ -36,6 +52,16 @@ const OSM_STYLE: StyleSpecification = {
 };
 
 const UK_CENTER: [number, number] = [-1.5, 52.7];
+
+// GeoJSON clustering source + layers (MapLibre's built-in supercluster
+// integration) replace the old one-Marker-per-event approach — at a few
+// thousand events, individual DOM-backed Markers get visibly slow to
+// create/remove on every filter change, where a single vector source just
+// gets `.setData()`'d. See docs/PROJECT_PLAN.md Phase 6.
+const SOURCE_ID = "events";
+const CLUSTER_LAYER_ID = "clusters";
+const CLUSTER_COUNT_LAYER_ID = "cluster-count";
+const UNCLUSTERED_LAYER_ID = "unclustered-point";
 
 interface MapViewProps {
   events: EventListItem[];
@@ -189,6 +215,44 @@ function buildPopupElement(
   return container;
 }
 
+interface PopupOpts {
+  signedIn: boolean;
+  favouriteEventIds: Set<string>;
+  favouriteVenueIds: Set<string>;
+  onToggleEventFavourite: (eventId: string) => void;
+  onToggleVenueFavourite: (venueId: string) => void;
+}
+
+// Thin wrapper around buildPopupElement that reads favourite state from the
+// PopupOpts shape stored in a ref (see popupOptsRef below) — kept as a
+// standalone function (not a closure over component state) so click
+// handlers registered once, at map creation, can call it with whatever the
+// ref currently holds instead of a stale snapshot from mount time.
+function buildPopupElementFor(event: EventListItem, opts: PopupOpts): HTMLElement {
+  const venueId = event.venues!.id;
+  return buildPopupElement(event, event.venues!.name, venueId, {
+    signedIn: opts.signedIn,
+    eventFavourited: opts.favouriteEventIds.has(event.id),
+    venueFavourited: opts.favouriteVenueIds.has(venueId),
+    onToggleEvent: () => opts.onToggleEventFavourite(event.id),
+    onToggleVenue: () => opts.onToggleVenueFavourite(venueId),
+  });
+}
+
+function toFeatureCollection(events: EventListItem[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: events.map((event) => ({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [event.venues!.lng!, event.venues!.lat!],
+      },
+      properties: { id: event.id },
+    })),
+  };
+}
+
 export default function MapView({
   events,
   error,
@@ -200,70 +264,176 @@ export default function MapView({
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markersRef = useRef<Marker[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const located = events.filter(
     (event) => event.venues?.lat != null && event.venues?.lng != null
   );
 
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-
-    mapRef.current = new MapLibreMap({
-      container: containerRef.current,
-      style: OSM_STYLE,
-      center: UK_CENTER,
-      zoom: 5,
-    });
-    mapRef.current.addControl(new NavigationControl(), "top-right");
-
-    return () => {
-      mapRef.current?.remove();
-      mapRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
-
-    if (located.length === 0) return;
-
-    const bounds = new LngLatBounds();
-
-    for (const event of located) {
-      const lng = event.venues!.lng!;
-      const lat = event.venues!.lat!;
-
-      const popupEl = buildPopupElement(event, event.venues!.name, event.venues!.id, {
-        signedIn,
-        eventFavourited: favouriteEventIds.has(event.id),
-        venueFavourited: favouriteVenueIds.has(event.venues!.id),
-        onToggleEvent: () => onToggleEventFavourite(event.id),
-        onToggleVenue: () => onToggleVenueFavourite(event.venues!.id),
-      });
-
-      const marker = new Marker({ color: "#16a34a" })
-        .setLngLat([lng, lat])
-        .setPopup(new Popup({ offset: 24 }).setDOMContent(popupEl))
-        .addTo(map);
-
-      markersRef.current.push(marker);
-      bounds.extend([lng, lat]);
-    }
-
-    map.fitBounds(bounds, { padding: 64, maxZoom: 12, duration: 0 });
-  }, [
-    located,
+  // Refs read by click handlers that are registered once (at map creation)
+  // rather than re-registered every render — each ref is refreshed after
+  // every commit below, so a handler invoked later always sees current
+  // data/favourite state despite the handler closure itself being "stale".
+  const eventsByIdRef = useRef<Map<string, EventListItem>>(new Map());
+  const popupOptsRef = useRef<PopupOpts>({
     signedIn,
     favouriteEventIds,
     favouriteVenueIds,
     onToggleEventFavourite,
     onToggleVenueFavourite,
-  ]);
+  });
+  // At most one popup is ever open at a time (MapLibre closes the previous
+  // one when a new one opens) — tracking it lets favourite toggles update
+  // the open popup's content in place instead of only affecting the next
+  // click, with no marker/source rebuild and no fitBounds involved.
+  const openPopupRef = useRef<{ popup: Popup; eventId: string } | null>(null);
+
+  useEffect(() => {
+    eventsByIdRef.current = new Map(located.map((event) => [event.id, event]));
+  });
+
+  useEffect(() => {
+    popupOptsRef.current = {
+      signedIn,
+      favouriteEventIds,
+      favouriteVenueIds,
+      onToggleEventFavourite,
+      onToggleVenueFavourite,
+    };
+    const open = openPopupRef.current;
+    if (!open) return;
+    const event = eventsByIdRef.current.get(open.eventId);
+    if (!event) return;
+    open.popup.setDOMContent(buildPopupElementFor(event, popupOptsRef.current));
+  });
+
+  // Map + clustering layers are created once. Click handlers are registered
+  // here too, reading eventsByIdRef/popupOptsRef at call time rather than
+  // closing over any per-render value, so they never need to be re-attached.
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = new MapLibreMap({
+      container: containerRef.current,
+      style: OSM_STYLE,
+      center: UK_CENTER,
+      zoom: 5,
+    });
+    mapRef.current = map;
+    map.addControl(new NavigationControl(), "top-right");
+
+    map.on("load", () => {
+      map.addSource(SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      });
+
+      map.addLayer({
+        id: CLUSTER_LAYER_ID,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#16a34a",
+          "circle-opacity": 0.85,
+          "circle-radius": ["step", ["get", "point_count"], 16, 10, 20, 50, 26],
+        },
+      });
+
+      map.addLayer({
+        id: CLUSTER_COUNT_LAYER_ID,
+        type: "symbol",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-size": 12,
+        },
+        paint: { "text-color": "#ffffff" },
+      });
+
+      map.addLayer({
+        id: UNCLUSTERED_LAYER_ID,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": "#16a34a",
+          "circle-radius": 7,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      map.on("click", CLUSTER_LAYER_ID, async (e) => {
+        const feature = e.features?.[0];
+        if (!feature || feature.geometry.type !== "Point") return;
+        const clusterId = feature.properties?.cluster_id as number | undefined;
+        if (clusterId == null) return;
+
+        const source = map.getSource(SOURCE_ID) as GeoJSONSource;
+        const zoom = await source.getClusterExpansionZoom(clusterId);
+        map.easeTo({ center: feature.geometry.coordinates as [number, number], zoom });
+      });
+
+      map.on("click", UNCLUSTERED_LAYER_ID, (e) => {
+        const feature = e.features?.[0];
+        if (!feature || feature.geometry.type !== "Point") return;
+        const eventId = feature.properties?.id as string | undefined;
+        const event = eventId ? eventsByIdRef.current.get(eventId) : undefined;
+        if (!event) return;
+
+        const popup = new Popup({ offset: 12 })
+          .setLngLat(feature.geometry.coordinates as [number, number])
+          .setDOMContent(buildPopupElementFor(event, popupOptsRef.current))
+          .addTo(map);
+        openPopupRef.current = { popup, eventId: event.id };
+        popup.on("close", () => {
+          if (openPopupRef.current?.popup === popup) openPopupRef.current = null;
+        });
+      });
+
+      for (const layerId of [CLUSTER_LAYER_ID, UNCLUSTERED_LAYER_ID]) {
+        map.on("mouseenter", layerId, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", layerId, () => {
+          map.getCanvas().style.cursor = "";
+        });
+      }
+
+      setMapLoaded(true);
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      setMapLoaded(false);
+    };
+  }, []);
+
+  // Keeps the clustering source's data in sync with which events currently
+  // have coordinates, and fits the map to them. Deliberately does NOT
+  // depend on favourite/signedIn state — those only affect on-demand popup
+  // content (built at click time from the refs above), so toggling a
+  // favourite can never re-trigger a source rebuild or re-fit here.
+  useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+    if (!map || !mapLoaded || !source) return;
+
+    source.setData(toFeatureCollection(located));
+
+    if (located.length === 0) return;
+    const bounds = new LngLatBounds();
+    for (const event of located) {
+      bounds.extend([event.venues!.lng!, event.venues!.lat!]);
+    }
+    map.fitBounds(bounds, { padding: 64, maxZoom: 12, duration: 0 });
+  }, [located, mapLoaded]);
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] w-full">
