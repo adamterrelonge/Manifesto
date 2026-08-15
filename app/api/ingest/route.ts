@@ -109,6 +109,7 @@ import {
   fetchHepworthWakefieldEvents,
   normaliseHepworthWakefieldEvent,
 } from "@/lib/sources/hepworth-wakefield";
+import { fetchIbraazEvents, normaliseIbraazEvent } from "@/lib/sources/ibraaz";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -751,6 +752,21 @@ async function ingestHepworthWakefield(admin: AdminClient): Promise<SourceResult
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestIbraaz(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchIbraazEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseIbraazEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -808,6 +824,7 @@ export async function GET(request: NextRequest) {
     yorkshireSculpturePark,
     pallantHouse,
     hepworthWakefield,
+    ibraaz,
   ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
@@ -847,6 +864,7 @@ export async function GET(request: NextRequest) {
     runSource("yorkshire-sculpture-park", () => ingestYorkshireSculpturePark(admin)),
     runSource("pallant-house", () => ingestPallantHouse(admin)),
     runSource("hepworth-wakefield", () => ingestHepworthWakefield(admin)),
+    runSource("ibraaz", () => ingestIbraaz(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -938,6 +956,7 @@ export async function GET(request: NextRequest) {
       yorkshireSculpturePark,
       pallantHouse,
       hepworthWakefield,
+      ibraaz,
     },
     expiry,
     dedup,

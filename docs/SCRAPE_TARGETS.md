@@ -89,6 +89,7 @@ Before spending time building selectors for any entry below:
 | Hayward Gallery (Southbank Centre) | ❌ Attempted, blocked — robots.txt itself is permissive, but `/whats-on` returns `403` to Node's `fetch` (same Cloudflare/WAF false-pass pattern as Royal Academy: looks fine to WebFetch/curl, blocked for the runtime Vercel actually uses) |
 | Dulwich Picture Gallery | ❌ Attempted, blocked — robots.txt permissive (`Disallow: /admin/*` only), but `/exhibitions` returns `403` to Node's `fetch`, same Cloudflare/WAF pattern |
 | Wallace Collection | ❌ Not attempted — robots.txt explicitly blocks `ClaudeBot`/`GPTBot`/`CCBot`/`Amazonbot`/`Applebot-Extended`/`Bytespider`/`Google-Extended`/`meta-externalagent`/`CloudflareBrowserRenderingCrawler` with `Disallow: /`; skipping per the operator's stated signal, same policy as NPG/NHM |
+| Ibraaz | ✅ Implemented (`lib/sources/ibraaz.ts`) — not previously tracked in this list; London (Fitzrovia), arts/culture space. Nuxt SSR `/whats-on` — cards carry an authoritative ISO `<time datetime>` start plus free-text for the end date; detail-page fetch for the description and for `isFree` (inferred from presence/absence of the Ticket Tailor `.tt-widget` booking widget, since price itself is never in the static HTML) |
 
 ---
 
