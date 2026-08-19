@@ -9,6 +9,7 @@ import EventsListView from "@/app/components/views/EventsListView";
 import MapView from "@/app/components/views/MapView";
 import CardsView from "@/app/components/views/CardsView";
 import type { EventListItem } from "@/lib/types";
+import { groupEvents } from "@/lib/group-events";
 import { useUser } from "@/lib/hooks/useUser";
 import { haversineDistanceKm } from "@/lib/geo";
 import {
@@ -156,6 +157,12 @@ export default function AppShell({ events, error }: AppShellProps) {
     );
   }, [events, dateFilter, filters, homeLocation, searchQuery]);
 
+  // Collapses repeat occurrences of the same production (same title/venue/
+  // category — e.g. a week of showtimes) into one listing with multiple
+  // dates, applied after filtering so every view (list/map/cards) groups
+  // identically and never disagrees about what's currently visible.
+  const groupedEvents = useMemo(() => groupEvents(filteredEvents), [filteredEvents]);
+
   return (
     <div className="flex min-h-screen flex-1 flex-col">
       <Header
@@ -176,7 +183,7 @@ export default function AppShell({ events, error }: AppShellProps) {
         <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-black">
           {view === "list" && (
             <EventsListView
-              events={filteredEvents}
+              groups={groupedEvents}
               error={error}
               signedIn={!!user}
               favouriteEventIds={favouriteEventIds}
@@ -189,7 +196,7 @@ export default function AppShell({ events, error }: AppShellProps) {
           )}
           {view === "map" && (
             <MapView
-              events={filteredEvents}
+              groups={groupedEvents}
               error={error}
               signedIn={!!user}
               favouriteEventIds={favouriteEventIds}
@@ -200,7 +207,7 @@ export default function AppShell({ events, error }: AppShellProps) {
           )}
           {view === "cards" && (
             <CardsView
-              events={filteredEvents}
+              groups={groupedEvents}
               error={error}
               signedIn={!!user}
               favouriteEventIds={favouriteEventIds}

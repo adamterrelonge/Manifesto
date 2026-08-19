@@ -1,5 +1,6 @@
 import type { NormalisedEvent } from "@/lib/types";
 import type { Category } from "@/lib/categories";
+import { normaliseUkRegion } from "@/lib/uk-region";
 
 // Request shape confirmed against https://github.com/Skiddle/web-api/wiki/Events-API.
 // Response field names below were reverse-engineered from live responses
@@ -158,7 +159,7 @@ export function normaliseSkiddleEvent(raw: SkiddleRawEvent): NormalisedEvent {
           name: raw.venue.name ?? "Unknown venue",
           address: raw.venue.address ?? null,
           city: raw.venue.town ?? null,
-          region: raw.venue.region ?? null,
+          region: normaliseUkRegion(raw.venue.region),
           postcode: raw.venue.postcode ?? null,
           lat: toNumber(raw.venue.latitude),
           lng: toNumber(raw.venue.longitude),

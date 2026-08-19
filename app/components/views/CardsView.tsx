@@ -1,9 +1,10 @@
-import type { EventListItem } from "@/lib/types";
+import type { EventGroup } from "@/lib/group-events";
 import { formatEventDate, formatEventPrice } from "@/lib/format";
 import FavouriteButton from "@/app/components/FavouriteButton";
+import OccurrenceDates from "@/app/components/OccurrenceDates";
 
 interface CardsViewProps {
-  events: EventListItem[];
+  groups: EventGroup[];
   error: string | null;
   signedIn: boolean;
   favouriteEventIds: Set<string>;
@@ -11,7 +12,7 @@ interface CardsViewProps {
 }
 
 export default function CardsView({
-  events,
+  groups,
   error,
   signedIn,
   favouriteEventIds,
@@ -27,7 +28,7 @@ export default function CardsView({
     );
   }
 
-  if (events.length === 0) {
+  if (groups.length === 0) {
     return (
       <div className="px-6 py-16">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -43,26 +44,29 @@ export default function CardsView({
 
   return (
     <div className="grid grid-cols-1 gap-5 px-6 py-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {events.map((event) => {
-        const price = formatEventPrice(event);
+      {groups.map((group) => {
+        const price = formatEventPrice(group);
+        const isGrouped = group.occurrences.length > 1;
         const card = (
           <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <div className="relative aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-900">
               {signedIn && (
                 <FavouriteButton
-                  favourited={favouriteEventIds.has(event.id)}
-                  onToggle={() => onToggleEventFavourite(event.id)}
+                  favourited={favouriteEventIds.has(group.primaryEventId)}
+                  onToggle={() => onToggleEventFavourite(group.primaryEventId)}
                   label={
-                    favouriteEventIds.has(event.id) ? "Remove from favourites" : "Add to favourites"
+                    favouriteEventIds.has(group.primaryEventId)
+                      ? "Remove from favourites"
+                      : "Add to favourites"
                   }
-                  itemName={event.title}
+                  itemName={group.title}
                   className="absolute right-2 top-2 z-10 h-6 w-6 text-white drop-shadow"
                 />
               )}
-              {event.image_url ? (
+              {group.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element -- external, unoptimized Skiddle-hosted images
                 <img
-                  src={event.image_url}
+                  src={group.image_url}
                   alt=""
                   className="h-full w-full object-cover"
                   loading="lazy"
@@ -75,17 +79,20 @@ export default function CardsView({
             </div>
             <div className="flex flex-1 flex-col gap-1 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                {formatEventDate(event.start_at)}
-                {event.category ? ` · ${event.category}` : ""}
+                {isGrouped ? `${group.occurrences.length} dates` : formatEventDate(group.occurrences[0].start_at)}
+                {group.category ? ` · ${group.category}` : ""}
               </p>
               <h2 className="line-clamp-2 text-base font-medium text-black dark:text-zinc-50">
-                {event.title}
+                {group.title}
               </h2>
-              {event.venues && (
+              {group.venues && (
                 <p className="line-clamp-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  {event.venues.name}
-                  {event.venues.city ? `, ${event.venues.city}` : ""}
+                  {group.venues.name}
+                  {group.venues.city ? `, ${group.venues.city}` : ""}
                 </p>
+              )}
+              {isGrouped && (
+                <OccurrenceDates occurrences={group.occurrences} max={4} className="mt-1" />
               )}
               {price && (
                 <p className="mt-auto pt-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -96,10 +103,10 @@ export default function CardsView({
           </div>
         );
 
-        return event.source_url ? (
+        return group.source_url ? (
           <a
-            key={event.id}
-            href={event.source_url}
+            key={group.key}
+            href={group.source_url}
             target="_blank"
             rel="noopener noreferrer"
             className="block h-full"
@@ -107,7 +114,7 @@ export default function CardsView({
             {card}
           </a>
         ) : (
-          <div key={event.id}>{card}</div>
+          <div key={group.key}>{card}</div>
         );
       })}
     </div>

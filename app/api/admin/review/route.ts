@@ -34,17 +34,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: excludedError.message }, { status: 500 });
   }
 
+  // Rejected pairs are kept (not deleted) so re-ingestion doesn't resurrect
+  // them — see 0012_bucket_rejected_state.sql. They're included here (not
+  // filtered out) so the admin UI can show them in their own "Rejected" tab
+  // instead of just dropping them from view.
   let query = admin
     .from("event_buckets")
     .select(
       "event_id, bucket_id, confidence, evidence, assigned_by, events(title, start_at), buckets(slug, label)"
     )
-    // Rejected pairs are kept (not deleted) so re-ingestion doesn't
-    // resurrect them — see 0012_bucket_rejected_state.sql — but there's
-    // nothing left to review, so they never belong in this queue.
-    .neq("assigned_by", "rejected")
     .order("confidence", { ascending: true })
-    .limit(500);
+    .limit(1000);
 
   const excludedIds = (excludedBuckets ?? []).map((b) => b.id as string);
   if (excludedIds.length > 0) {

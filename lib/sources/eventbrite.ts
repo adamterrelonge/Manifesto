@@ -3,6 +3,7 @@ import {
   EVENTBRITE_ORGANISERS,
   type EventbriteOrganiser,
 } from "@/lib/sources/eventbrite-organisers";
+import { normaliseUkRegion } from "@/lib/uk-region";
 
 // Eventbrite deprecated public event search (GET /v3/events/search/) in Dec
 // 2019 — https://github.com/Automattic/eventbrite-api/issues/83 — and there
@@ -135,7 +136,7 @@ export function normaliseEventbriteEvent(
           name: raw.venue.name ?? "Unknown venue",
           address: raw.venue.address?.address_1 ?? null,
           city: raw.venue.address?.city ?? null,
-          region: raw.venue.address?.region ?? null,
+          region: normaliseUkRegion(raw.venue.address?.region),
           postcode: raw.venue.address?.postal_code ?? null,
           lat: toNumber(raw.venue.address?.latitude),
           lng: toNumber(raw.venue.address?.longitude),

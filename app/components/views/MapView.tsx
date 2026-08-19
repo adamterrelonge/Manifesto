@@ -11,8 +11,8 @@ import {
   type GeoJSONSource,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { EventListItem } from "@/lib/types";
-import { formatEventDate, formatEventPrice } from "@/lib/format";
+import type { EventGroup } from "@/lib/group-events";
+import { formatEventDate, formatEventPrice, formatShortDate } from "@/lib/format";
 
 // maplibre-gl's clustering (GeoJSON source with cluster:true) runs
 // supercluster in a Web Worker. Its default worker-URL resolution derives
@@ -64,7 +64,7 @@ const CLUSTER_COUNT_LAYER_ID = "cluster-count";
 const UNCLUSTERED_LAYER_ID = "unclustered-point";
 
 interface MapViewProps {
-  events: EventListItem[];
+  groups: EventGroup[];
   error: string | null;
   signedIn: boolean;
   favouriteEventIds: Set<string>;
@@ -131,7 +131,7 @@ function heartButton(favourited: boolean, label: string, onClick: () => void): H
 // venue name) goes through textContent, sidestepping the escapeHtml/
 // safeHref dance entirely for everything except the one <a> href.
 function buildPopupElement(
-  event: EventListItem,
+  group: EventGroup,
   venueName: string,
   venueId: string | null,
   opts: {
@@ -142,8 +142,8 @@ function buildPopupElement(
     onToggleVenue: () => void;
   }
 ): HTMLElement {
-  const price = formatEventPrice(event);
-  const href = safeHref(event.source_url);
+  const price = formatEventPrice(group);
+  const href = safeHref(group.source_url);
 
   const container = document.createElement("div");
   container.style.cssText = "font-family: inherit; max-width: 220px;";
@@ -154,14 +154,39 @@ function buildPopupElement(
   const textCol = document.createElement("div");
   textCol.style.cssText = "min-width:0;";
 
-  const dateEl = document.createElement("p");
-  dateEl.style.cssText = "margin: 0 0 2px; font-size: 12px; color: #71717a;";
-  dateEl.textContent = formatEventDate(event.start_at);
-  textCol.appendChild(dateEl);
+  // A single occurrence gets the usual full date; more than one renders as
+  // a wrapped row of short date chips (mirrors OccurrenceDates.tsx's
+  // React version — this popup is plain DOM, built imperatively by
+  // maplibre-gl, so it can't render that component directly).
+  if (group.occurrences.length <= 1) {
+    const dateEl = document.createElement("p");
+    dateEl.style.cssText = "margin: 0 0 2px; font-size: 12px; color: #71717a;";
+    dateEl.textContent = formatEventDate(group.occurrences[0].start_at);
+    textCol.appendChild(dateEl);
+  } else {
+    const datesEl = document.createElement("div");
+    datesEl.style.cssText = "display:flex; flex-wrap:wrap; gap:3px; margin: 0 0 4px;";
+    const shown = group.occurrences.slice(0, 4);
+    for (const occurrence of shown) {
+      const chip = document.createElement("span");
+      chip.style.cssText =
+        "background:#f4f4f5; color:#52525b; border-radius:4px; padding:1px 5px; font-size:11px; font-weight:500;";
+      chip.textContent = formatShortDate(occurrence.start_at);
+      datesEl.appendChild(chip);
+    }
+    const remaining = group.occurrences.length - shown.length;
+    if (remaining > 0) {
+      const more = document.createElement("span");
+      more.style.cssText = "font-size:11px; color:#a1a1aa; align-self:center;";
+      more.textContent = `+${remaining} more`;
+      datesEl.appendChild(more);
+    }
+    textCol.appendChild(datesEl);
+  }
 
   const titleEl = document.createElement("p");
   titleEl.style.cssText = "margin: 0 0 2px; font-weight: 600;";
-  titleEl.textContent = event.title;
+  titleEl.textContent = group.title;
   textCol.appendChild(titleEl);
 
   const venueEl = document.createElement("p");
@@ -228,33 +253,33 @@ interface PopupOpts {
 // standalone function (not a closure over component state) so click
 // handlers registered once, at map creation, can call it with whatever the
 // ref currently holds instead of a stale snapshot from mount time.
-function buildPopupElementFor(event: EventListItem, opts: PopupOpts): HTMLElement {
-  const venueId = event.venues!.id;
-  return buildPopupElement(event, event.venues!.name, venueId, {
+function buildPopupElementFor(group: EventGroup, opts: PopupOpts): HTMLElement {
+  const venueId = group.venues!.id;
+  return buildPopupElement(group, group.venues!.name, venueId, {
     signedIn: opts.signedIn,
-    eventFavourited: opts.favouriteEventIds.has(event.id),
+    eventFavourited: opts.favouriteEventIds.has(group.primaryEventId),
     venueFavourited: opts.favouriteVenueIds.has(venueId),
-    onToggleEvent: () => opts.onToggleEventFavourite(event.id),
+    onToggleEvent: () => opts.onToggleEventFavourite(group.primaryEventId),
     onToggleVenue: () => opts.onToggleVenueFavourite(venueId),
   });
 }
 
-function toFeatureCollection(events: EventListItem[]): GeoJSON.FeatureCollection {
+function toFeatureCollection(groups: EventGroup[]): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
-    features: events.map((event) => ({
+    features: groups.map((group) => ({
       type: "Feature",
       geometry: {
         type: "Point",
-        coordinates: [event.venues!.lng!, event.venues!.lat!],
+        coordinates: [group.venues!.lng!, group.venues!.lat!],
       },
-      properties: { id: event.id },
+      properties: { key: group.key },
     })),
   };
 }
 
 export default function MapView({
-  events,
+  groups,
   error,
   signedIn,
   favouriteEventIds,
@@ -266,15 +291,15 @@ export default function MapView({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const located = events.filter(
-    (event) => event.venues?.lat != null && event.venues?.lng != null
+  const located = groups.filter(
+    (group) => group.venues?.lat != null && group.venues?.lng != null
   );
 
   // Refs read by click handlers that are registered once (at map creation)
   // rather than re-registered every render — each ref is refreshed after
   // every commit below, so a handler invoked later always sees current
   // data/favourite state despite the handler closure itself being "stale".
-  const eventsByIdRef = useRef<Map<string, EventListItem>>(new Map());
+  const groupsByKeyRef = useRef<Map<string, EventGroup>>(new Map());
   const popupOptsRef = useRef<PopupOpts>({
     signedIn,
     favouriteEventIds,
@@ -286,10 +311,10 @@ export default function MapView({
   // one when a new one opens) — tracking it lets favourite toggles update
   // the open popup's content in place instead of only affecting the next
   // click, with no marker/source rebuild and no fitBounds involved.
-  const openPopupRef = useRef<{ popup: Popup; eventId: string } | null>(null);
+  const openPopupRef = useRef<{ popup: Popup; groupKey: string } | null>(null);
 
   useEffect(() => {
-    eventsByIdRef.current = new Map(located.map((event) => [event.id, event]));
+    groupsByKeyRef.current = new Map(located.map((group) => [group.key, group]));
   });
 
   useEffect(() => {
@@ -302,13 +327,13 @@ export default function MapView({
     };
     const open = openPopupRef.current;
     if (!open) return;
-    const event = eventsByIdRef.current.get(open.eventId);
-    if (!event) return;
-    open.popup.setDOMContent(buildPopupElementFor(event, popupOptsRef.current));
+    const group = groupsByKeyRef.current.get(open.groupKey);
+    if (!group) return;
+    open.popup.setDOMContent(buildPopupElementFor(group, popupOptsRef.current));
   });
 
   // Map + clustering layers are created once. Click handlers are registered
-  // here too, reading eventsByIdRef/popupOptsRef at call time rather than
+  // here too, reading groupsByKeyRef/popupOptsRef at call time rather than
   // closing over any per-render value, so they never need to be re-attached.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -382,15 +407,15 @@ export default function MapView({
       map.on("click", UNCLUSTERED_LAYER_ID, (e) => {
         const feature = e.features?.[0];
         if (!feature || feature.geometry.type !== "Point") return;
-        const eventId = feature.properties?.id as string | undefined;
-        const event = eventId ? eventsByIdRef.current.get(eventId) : undefined;
-        if (!event) return;
+        const key = feature.properties?.key as string | undefined;
+        const group = key ? groupsByKeyRef.current.get(key) : undefined;
+        if (!group) return;
 
         const popup = new Popup({ offset: 12 })
           .setLngLat(feature.geometry.coordinates as [number, number])
-          .setDOMContent(buildPopupElementFor(event, popupOptsRef.current))
+          .setDOMContent(buildPopupElementFor(group, popupOptsRef.current))
           .addTo(map);
-        openPopupRef.current = { popup, eventId: event.id };
+        openPopupRef.current = { popup, groupKey: group.key };
         popup.on("close", () => {
           if (openPopupRef.current?.popup === popup) openPopupRef.current = null;
         });
@@ -429,8 +454,8 @@ export default function MapView({
 
     if (located.length === 0) return;
     const bounds = new LngLatBounds();
-    for (const event of located) {
-      bounds.extend([event.venues!.lng!, event.venues!.lat!]);
+    for (const group of located) {
+      bounds.extend([group.venues!.lng!, group.venues!.lat!]);
     }
     map.fitBounds(bounds, { padding: 64, maxZoom: 12, duration: 0 });
   }, [located, mapLoaded]);

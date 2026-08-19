@@ -15,6 +15,8 @@ interface ReviewRow {
   buckets: { slug: string; label: string } | null;
 }
 
+type GroupStatus = "pending" | "approved" | "rejected";
+
 // Events with the same title and bucket are collapsed into one group so the
 // user can approve/reject all occurrences (e.g. a weekly screening, a multi-
 // day exhibition ingested per-day) with a single click.
@@ -26,37 +28,49 @@ interface ReviewGroup {
   minConfidence: number;
   evidence: string;
   rows: ReviewRow[];
-  allReviewed: boolean;
+  status: GroupStatus;
+}
+
+// "Approve all"/"reject all" apply to every row in a group atomically, so a
+// group's rows only ever end up mixed transiently — treat any row still
+// awaiting a decision as making the whole group "pending" so it's never
+// silently hidden from the queue.
+function groupStatus(rows: ReviewRow[]): GroupStatus {
+  if (rows.every((r) => r.assigned_by === "moderator")) return "approved";
+  if (rows.every((r) => r.assigned_by === "rejected")) return "rejected";
+  return "pending";
 }
 
 function buildGroups(rows: ReviewRow[]): ReviewGroup[] {
-  const map = new Map<string, ReviewGroup>();
+  const map = new Map<string, ReviewRow[]>();
 
   for (const row of rows) {
     const title = row.events?.title ?? "(deleted event)";
     const key = `${title}::${row.bucket_id}`;
-
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        title,
-        bucketId: row.bucket_id,
-        bucketLabel: row.buckets?.label ?? row.buckets?.slug ?? "unknown bucket",
-        minConfidence: row.confidence,
-        evidence: row.evidence ?? "",
-        rows: [],
-        allReviewed: true,
-      });
-    }
-
-    const g = map.get(key)!;
-    g.rows.push(row);
-    if (row.confidence < g.minConfidence) g.minConfidence = row.confidence;
-    if (row.assigned_by !== "moderator") g.allReviewed = false;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(row);
   }
 
-  return [...map.values()];
+  return [...map.entries()].map(([key, groupRows]) => {
+    const first = groupRows[0];
+    return {
+      key,
+      title: first.events?.title ?? "(deleted event)",
+      bucketId: first.bucket_id,
+      bucketLabel: first.buckets?.label ?? first.buckets?.slug ?? "unknown bucket",
+      minConfidence: Math.min(...groupRows.map((r) => r.confidence)),
+      evidence: first.evidence ?? "",
+      rows: groupRows,
+      status: groupStatus(groupRows),
+    };
+  });
 }
+
+const TABS: { key: GroupStatus; label: string }[] = [
+  { key: "pending", label: "Needs review" },
+  { key: "approved", label: "Approved" },
+  { key: "rejected", label: "Rejected" },
+];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -76,6 +90,7 @@ export default function AdminReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [moderatorEmail, setModeratorEmail] = useState("");
   const [moderatorStatus, setModeratorStatus] = useState<string | null>(null);
+  const [tab, setTab] = useState<GroupStatus>("pending");
 
   const fetchRows = useCallback(async (currentSecret: string) => {
     setLoading(true);
@@ -139,21 +154,15 @@ export default function AdminReviewPage() {
       return;
     }
 
-    if (action === "reject") {
-      const removedIds = new Set(group.rows.map((r) => r.event_id));
-      setRows((prev) =>
-        prev.filter((r) => !(removedIds.has(r.event_id) && r.bucket_id === group.bucketId))
-      );
-    } else {
-      const approvedIds = new Set(group.rows.map((r) => r.event_id));
-      setRows((prev) =>
-        prev.map((r) =>
-          approvedIds.has(r.event_id) && r.bucket_id === group.bucketId
-            ? { ...r, assigned_by: "moderator" }
-            : r
-        )
-      );
-    }
+    const affectedIds = new Set(group.rows.map((r) => r.event_id));
+    const newAssignedBy = action === "reject" ? "rejected" : "moderator";
+    setRows((prev) =>
+      prev.map((r) =>
+        affectedIds.has(r.event_id) && r.bucket_id === group.bucketId
+          ? { ...r, assigned_by: newAssignedBy }
+          : r
+      )
+    );
   }
 
   async function setModeratorTrust(trusted: boolean) {
@@ -211,15 +220,18 @@ export default function AdminReviewPage() {
     );
   }
 
-  const groups = buildGroups(rows);
+  const allGroups = buildGroups(rows);
+  const tabCounts: Record<GroupStatus, number> = {
+    pending: allGroups.filter((g) => g.status === "pending").length,
+    approved: allGroups.filter((g) => g.status === "approved").length,
+    rejected: allGroups.filter((g) => g.status === "rejected").length,
+  };
+  const groups = allGroups.filter((g) => g.status === tab);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-12">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-black dark:text-zinc-50">
-          Bucket tag review ({groups.length} group{groups.length !== 1 ? "s" : ""},{" "}
-          {rows.length} row{rows.length !== 1 ? "s" : ""})
-        </h1>
+        <h1 className="text-xl font-semibold text-black dark:text-zinc-50">Bucket tag review</h1>
         <button
           type="button"
           onClick={() => secret && fetchRows(secret)}
@@ -229,10 +241,28 @@ export default function AdminReviewPage() {
         </button>
       </div>
 
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={[
+              "-mb-px rounded-t-md border-b-2 px-3 py-2 text-sm font-medium",
+              tab === t.key
+                ? "border-black text-black dark:border-white dark:text-zinc-50"
+                : "border-transparent text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-zinc-200",
+            ].join(" ")}
+          >
+            {t.label} ({tabCounts[t.key]})
+          </button>
+        ))}
+      </div>
+
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Events with the same title and bucket are grouped — use &ldquo;Approve all&rdquo; to
-        confirm every occurrence at once. Sorted lowest confidence first; below{" "}
-        {HIGH_CONFIDENCE_THRESHOLD * 100}% is worth checking.
+        {tab === "pending"
+          ? `Events with the same title and bucket are grouped — use "Approve all" to confirm every occurrence at once. Sorted lowest confidence first; below ${HIGH_CONFIDENCE_THRESHOLD * 100}% is worth checking.`
+          : `Groups you've already ${tab === "approved" ? "approved" : "rejected"} — kept here so the queue above stops resurfacing them.`}
       </p>
 
       <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
@@ -274,6 +304,10 @@ export default function AdminReviewPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-zinc-500">Loading…</p>}
 
+      {groups.length === 0 && !loading && (
+        <p className="text-sm text-zinc-500">Nothing here.</p>
+      )}
+
       <ul className="flex flex-col gap-3">
         {groups.map((group) => {
           const isLowConfidence = group.minConfidence < HIGH_CONFIDENCE_THRESHOLD;
@@ -300,28 +334,28 @@ export default function AdminReviewPage() {
                     {isGrouped && (
                       <span className="text-zinc-400">{group.rows.length} occurrences</span>
                     )}
-                    {group.allReviewed && (
-                      <span className="text-green-600">✓ all reviewed</span>
-                    )}
                   </p>
                 </div>
 
                 <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleGroupAction(group, "approve")}
-                    disabled={group.allReviewed}
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700"
-                  >
-                    {isGrouped ? "Approve all" : "Approve"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleGroupAction(group, "reject")}
-                    className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 dark:border-red-900 dark:text-red-400"
-                  >
-                    {isGrouped ? "Reject all" : "Reject"}
-                  </button>
+                  {group.status !== "approved" && (
+                    <button
+                      type="button"
+                      onClick={() => handleGroupAction(group, "approve")}
+                      className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700"
+                    >
+                      {group.status === "rejected" ? "Move to approved" : isGrouped ? "Approve all" : "Approve"}
+                    </button>
+                  )}
+                  {group.status !== "rejected" && (
+                    <button
+                      type="button"
+                      onClick={() => handleGroupAction(group, "reject")}
+                      className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 dark:border-red-900 dark:text-red-400"
+                    >
+                      {group.status === "approved" ? "Move to rejected" : isGrouped ? "Reject all" : "Reject"}
+                    </button>
+                  )}
                 </div>
               </div>
 

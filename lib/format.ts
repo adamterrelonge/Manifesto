@@ -8,8 +8,20 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
 });
 
+const shortDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+});
+
 export function formatEventDate(startAt: string): string {
   return dateFormatter.format(new Date(startAt));
+}
+
+// Compact form for date chips on a grouped event card ("16 Aug", no
+// weekday/time) — a row of these next to each other is what tells the date
+// apart, so it doesn't need the full formatEventDate treatment.
+export function formatShortDate(startAt: string): string {
+  return shortDateFormatter.format(new Date(startAt));
 }
 
 export function formatEventPrice(

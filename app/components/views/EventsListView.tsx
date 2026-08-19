@@ -1,11 +1,12 @@
-import type { EventListItem } from "@/lib/types";
-import { formatEventDate, formatEventPrice } from "@/lib/format";
+import type { EventGroup } from "@/lib/group-events";
+import { formatEventPrice } from "@/lib/format";
 import { categoryLabel } from "@/lib/categories";
 import { GappedArrowIcon } from "@/app/components/icons";
 import FavouriteButton from "@/app/components/FavouriteButton";
+import OccurrenceDates from "@/app/components/OccurrenceDates";
 
 interface EventsListViewProps {
-  events: EventListItem[];
+  groups: EventGroup[];
   error: string | null;
   signedIn: boolean;
   favouriteEventIds: Set<string>;
@@ -27,10 +28,10 @@ interface BucketChipEntry {
 // bucket_id is kept (not collapsed to a plain label string) so each chip
 // can carry its own "report this tag" control — see docs/PROJECT_PLAN.md
 // §13's report/flag pipeline.
-function bucketChipEntries(event: EventListItem): BucketChipEntry[] {
+function bucketChipEntries(group: EventGroup): BucketChipEntry[] {
   const seen = new Set<string>();
   const entries: BucketChipEntry[] = [];
-  for (const eb of event.event_buckets) {
+  for (const eb of group.event_buckets) {
     if (!eb.buckets || eb.assigned_by === "rejected" || seen.has(eb.bucket_id)) continue;
     seen.add(eb.bucket_id);
     entries.push({ bucketId: eb.bucket_id, label: eb.buckets.label });
@@ -39,7 +40,7 @@ function bucketChipEntries(event: EventListItem): BucketChipEntry[] {
 }
 
 export default function EventsListView({
-  events,
+  groups,
   error,
   signedIn,
   favouriteEventIds,
@@ -57,7 +58,7 @@ export default function EventsListView({
         </p>
       )}
 
-      {!error && events.length === 0 && (
+      {!error && groups.length === 0 && (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           No events yet. Trigger{" "}
           <code className="rounded bg-zinc-200 px-1 py-0.5 dark:bg-zinc-800">
@@ -67,23 +68,23 @@ export default function EventsListView({
         </p>
       )}
 
-      {events.length > 0 && (
+      {groups.length > 0 && (
         <ul className="flex flex-col gap-3">
-          {events.map((event) => {
-            const price = formatEventPrice(event);
-            const category = categoryLabel(event.category);
-            const bucketEntries = bucketChipEntries(event);
-            const venueLabel = event.venues
-              ? `${event.venues.name}${event.venues.city ? `, ${event.venues.city}` : ""}`
+          {groups.map((group) => {
+            const price = formatEventPrice(group);
+            const category = categoryLabel(group.category);
+            const bucketEntries = bucketChipEntries(group);
+            const venueLabel = group.venues
+              ? `${group.venues.name}${group.venues.city ? `, ${group.venues.city}` : ""}`
               : null;
 
             const rowContent = (
               <>
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800">
-                  {event.image_url ? (
+                  {group.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element -- external, unoptimized source images
                     <img
-                      src={event.image_url}
+                      src={group.image_url}
                       alt=""
                       className="h-full w-full object-cover"
                       loading="lazy"
@@ -94,42 +95,42 @@ export default function EventsListView({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] text-zinc-900 dark:text-zinc-50">
-                      {event.title}
+                      {group.title}
                     </p>
                     {signedIn && (
                       <FavouriteButton
-                        favourited={favouriteEventIds.has(event.id)}
-                        onToggle={() => onToggleEventFavourite(event.id)}
+                        favourited={favouriteEventIds.has(group.primaryEventId)}
+                        onToggle={() => onToggleEventFavourite(group.primaryEventId)}
                         label={
-                          favouriteEventIds.has(event.id)
+                          favouriteEventIds.has(group.primaryEventId)
                             ? "Remove event from favourites"
                             : "Add event to favourites"
                         }
-                        itemName={event.title}
+                        itemName={group.title}
                         className="h-3.5 w-3.5 shrink-0 text-zinc-400 hover:text-rose-500 dark:text-zinc-500 dark:hover:text-rose-400"
                       />
                     )}
                   </div>
 
                   <p className="mt-1 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
-                    {formatEventDate(event.start_at)}
+                    <OccurrenceDates occurrences={group.occurrences} max={5} />
                   </p>
 
-                  {venueLabel && event.venues && (
+                  {venueLabel && group.venues && (
                     <div className="mt-1 flex items-center gap-1.5">
                       <p className="min-w-0 truncate text-[13px] text-zinc-500 dark:text-zinc-400">
                         {venueLabel}
                       </p>
                       {signedIn && (
                         <FavouriteButton
-                          favourited={favouriteVenueIds.has(event.venues.id)}
-                          onToggle={() => onToggleVenueFavourite(event.venues!.id)}
+                          favourited={favouriteVenueIds.has(group.venues.id)}
+                          onToggle={() => onToggleVenueFavourite(group.venues!.id)}
                           label={
-                            favouriteVenueIds.has(event.venues.id)
+                            favouriteVenueIds.has(group.venues.id)
                               ? "Remove venue from favourites"
                               : "Add venue to favourites"
                           }
-                          itemName={event.venues.name}
+                          itemName={group.venues.name}
                           className="h-3.5 w-3.5 shrink-0 text-zinc-400 hover:text-rose-500 dark:text-zinc-500 dark:hover:text-rose-400"
                         />
                       )}
@@ -144,7 +145,7 @@ export default function EventsListView({
                         </span>
                       )}
                       {bucketEntries.map(({ bucketId, label }) => {
-                        const flagged = flaggedBucketKeys.has(`${event.id}:${bucketId}`);
+                        const flagged = flaggedBucketKeys.has(`${group.primaryEventId}:${bucketId}`);
                         return (
                           <span
                             key={bucketId}
@@ -165,7 +166,7 @@ export default function EventsListView({
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  if (!flagged) onFlagBucket(event.id, bucketId);
+                                  if (!flagged) onFlagBucket(group.primaryEventId, bucketId);
                                 }}
                                 className={
                                   flagged
@@ -198,10 +199,10 @@ export default function EventsListView({
               "group flex items-center gap-4 rounded-2xl bg-white/80 px-4 py-4 ring-black/5 backdrop-blur-sm transition-colors hover:bg-black/[0.03] dark:bg-zinc-900/60 dark:ring-white/10 dark:hover:bg-white/[0.04] sm:px-5 sm:py-5";
 
             return (
-              <li key={event.id}>
-                {event.source_url ? (
+              <li key={group.key}>
+                {group.source_url ? (
                   <a
-                    href={event.source_url}
+                    href={group.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={rowClassName}
