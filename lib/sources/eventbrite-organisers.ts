@@ -15,7 +15,6 @@ export interface EventbriteOrganiser {
 }
 
 export const EVENTBRITE_ORGANISERS: EventbriteOrganiser[] = [
-  // { id: "123456789", name: "Example Collective" },
   { id: "11347103582", name: "Black Ballad" },
   { id: "37663218863", name: "London LGBTQ+ Community Centre" },
   { id: "48548878793", name: "Exilio LGBTQ+ Latinx Party" },
@@ -90,4 +89,14 @@ export const EVENTBRITE_ORGANISERS: EventbriteOrganiser[] = [
   { id: "120923991856", name: "Monolithic Studio" },
   { id: "31107759633", name: "Oya Heart Warrior" },
   { id: "14605628700", name: "Tony Cealy" },
+  { id: "108729317521", name: "Itonisha Rowe" },
+  { id: "54402358323", name: "Hypha Studios" },
+  { id: "105544176521", name: "Aswatna Studio" },
+  { id: "21728722753", name: "Sober Girl Society" },
+  { id: "10830367574", name: "Feminist Library" },
+  { id: "30514125867", name: "Shape Arts" }, // Major UK disability-led arts org
+  { id: "18317789304", name: "Deaf Rave" },  // Deaf-led music, arts & cultural events
+  { id: "33827581123", name: "MENA Arts UK" },
+  { id: "30232298271", name: "MARSM UK" }, // Arab & North African music/cultural events
+  { id: "33358399311", name: "Brain Injury & Neurodivergence Network" },
 ];

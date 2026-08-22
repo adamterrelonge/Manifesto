@@ -81,19 +81,8 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "black british", confidence: 0.65 },
     { phrase: "afrobeats", confidence: 0.4 }, // Low: often just a club night genre
     { phrase: "amapiano", confidence: 0.4 },
-
-    // Institutional "designated audience" session framing — museums/theatres
-    // commonly title a specific screening/tour this way (e.g. "Black
-    // audience viewings: [exhibition]"), distinct from describing the
-    // event's own subject matter.
     { phrase: "black audience", confidence: 0.9 },
     { phrase: "black audiences", confidence: 0.9 },
-
-    // Cultural subject matter — exhibitions/films/talks about Black
-    // history, music or culture where the word "Black" describes the
-    // topic, not the intended audience. Added because exhibition titles
-    // like "The Music is Black: A British Story" won't contain compound
-    // phrases like "black british" but their descriptions reliably will.
     { phrase: "black music", confidence: 0.9 },
     { phrase: "black culture", confidence: 0.85 },
     { phrase: "black arts", confidence: 0.85 },
@@ -101,9 +90,6 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "black history", confidence: 0.8 },
     { phrase: "black experience", confidence: 0.85 },
     { phrase: "black stories", confidence: 0.85 },
-
-    // African art context — reliably signals Black/African diaspora art.
-    // "african artist" also matches "South African artist".
     { phrase: "african art", confidence: 0.8 },
     { phrase: "african artist", confidence: 0.75 },
   ],
@@ -167,8 +153,6 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "latin owned", confidence: 0.9 },
     { phrase: "latina-owned", confidence: 0.9 },
     { phrase: "latina owned", confidence: 0.9 },
-
-    // Regional & Community Phrases
     { phrase: "latin american", confidence: 0.85 },
     { phrase: "latin america", confidence: 0.8 },
     { phrase: "latin community", confidence: 0.85 },
@@ -225,6 +209,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "audio described", confidence: 0.9 },
     { phrase: "touch tour", confidence: 0.9 },
     { phrase: "disability-friendly", confidence: 0.9 },
+    { phrase: "accessible venue", confidence: 0.85 },
+    { phrase: "ramp access", confidence: 0.85 },
+    { phrase: "large print available", confidence: 0.8 },
   ],
   "autistic-friendly": [
     { phrase: "autism-friendly", confidence: 0.95 },
@@ -237,6 +224,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "quiet space available", confidence: 0.85 },
     { phrase: "neurodivergent-friendly", confidence: 0.9 },
     { phrase: "neurodivergent friendly", confidence: 0.9 },
+    { phrase: "quiet room", confidence: 0.85 },
+    { phrase: "sensory room", confidence: 0.9 },
+    { phrase: "ear defenders provided", confidence: 0.9 },
   ],
   "deaf-accessible": [
     { phrase: "bsl interpreted", confidence: 0.95 },
@@ -257,7 +247,12 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "female led", confidence: 0.85 },
     { phrase: "flinta", confidence: 0.95 }, // Female, Lesbian, Intersex, Trans, Agender
     { phrase: "women-only", confidence: 0.85 },
-    { phrase: "girls night", confidence: 0.4 }, // Low: often commercial marketing
+    { phrase: "girls night", confidence: 0.4 },
+    { phrase: "bsl signed", confidence: 0.9 },
+    { phrase: "deaf friendly", confidence: 0.85 },
+    { phrase: "subtitled", confidence: 0.7 },
+    { phrase: "female-founded", confidence: 0.9 },
+    { phrase: "women-founded", confidence: 0.9 },
   ],
   "sober-friendly": [
     { phrase: "alcohol-free", confidence: 0.95 },
@@ -267,6 +262,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "sober clubbing", confidence: 0.9 },
     { phrase: "dry event", confidence: 0.8 },
     { phrase: "no alcohol", confidence: 0.8 },
+    { phrase: "mocktails available", confidence: 0.75 },
+    { phrase: "dry bar", confidence: 0.85 },
+    { phrase: "sober curious", confidence: 0.85 },
   ],
   "grassroots-activism": [
     { phrase: "mutual aid", confidence: 0.95 },
@@ -279,6 +277,8 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "decolonial", confidence: 0.85 },
     { phrase: "banner making", confidence: 0.8 },
     { phrase: "zine workshop", confidence: 0.7 },
+    { phrase: "community assembly", confidence: 0.85 },
+    { phrase: "grassroots campaign", confidence: 0.85 },
   ],
   "low-income-access": [
     { phrase: "pay-what-you-can", confidence: 0.95 },

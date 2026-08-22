@@ -128,6 +128,15 @@ import {
   normaliseLeedsArtGalleryEvent,
 } from "@/lib/sources/leeds-art-gallery";
 import { fetchKelvingroveEvents, normaliseKelvingroveEvent } from "@/lib/sources/kelvingrove";
+import {
+  fetchOutsavvyEvents,
+  flattenOutsavvyEvents,
+  normaliseOutsavvyEvent,
+} from "@/lib/sources/outsavvy";
+import {
+  fetchNewArtGalleryWalsallEvents,
+  normaliseNewArtGalleryWalsallEvent,
+} from "@/lib/sources/new-art-gallery-walsall";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -860,6 +869,66 @@ async function ingestKelvingrove(admin: AdminClient): Promise<SourceResult> {
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestOutsavvy(admin: AdminClient): Promise<SourceResult> {
+  // Central-UK point + large radius, same "stand-in for the whole UK"
+  // approach as Skiddle above — Outsavvy's `range` unit (miles, per the
+  // docs) is more clearly specified than Skiddle's undocumented radius.
+  const DEFAULT_LATITUDE = 52.4862; // Birmingham
+  const DEFAULT_LONGITUDE = -1.8904;
+  const DEFAULT_RANGE = 200;
+
+  const today = new Date();
+  const horizon = new Date(today);
+  horizon.setDate(horizon.getDate() + 8);
+  const startDate = today.toISOString().slice(0, 10);
+  const endDate = horizon.toISOString().slice(0, 10);
+
+  const raw: Awaited<ReturnType<typeof fetchOutsavvyEvents>>["events"] = [];
+  const PAGE_SIZE = 50;
+  const MAX_PAGES = 10;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const batch = await fetchOutsavvyEvents({
+      latitude: DEFAULT_LATITUDE,
+      longitude: DEFAULT_LONGITUDE,
+      range: DEFAULT_RANGE,
+      startDate,
+      endDate,
+      pageNumber: page,
+      pageSize: PAGE_SIZE,
+    });
+    raw.push(...(batch.events ?? []));
+    if ((batch.events?.length ?? 0) < PAGE_SIZE) break;
+  }
+
+  const flattened = flattenOutsavvyEvents(raw);
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const eventDate of flattened) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseOutsavvyEvent(eventDate));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${eventDate.event.id}-${eventDate.date.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: flattened.length, upserted, errors };
+}
+
+async function ingestNewArtGalleryWalsall(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchNewArtGalleryWalsallEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseNewArtGalleryWalsallEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -923,6 +992,8 @@ export async function GET(request: NextRequest) {
     herbertCoventry,
     leedsArtGallery,
     kelvingrove,
+    outsavvy,
+    newArtGalleryWalsall,
   ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
@@ -968,6 +1039,8 @@ export async function GET(request: NextRequest) {
     runSource("herbert-coventry", () => ingestHerbertCoventry(admin)),
     runSource("leeds-art-gallery", () => ingestLeedsArtGallery(admin)),
     runSource("kelvingrove", () => ingestKelvingrove(admin)),
+    runSource("outsavvy", () => ingestOutsavvy(admin)),
+    runSource("new-art-gallery-walsall", () => ingestNewArtGalleryWalsall(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -1076,6 +1149,8 @@ export async function GET(request: NextRequest) {
       herbertCoventry,
       leedsArtGallery,
       kelvingrove,
+      outsavvy,
+      newArtGalleryWalsall,
     },
     expiry,
     dedup,
