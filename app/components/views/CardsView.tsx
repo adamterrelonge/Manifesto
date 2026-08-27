@@ -2,6 +2,7 @@ import type { EventGroup } from "@/lib/group-events";
 import { formatEventDate, formatEventPrice } from "@/lib/format";
 import FavouriteButton from "@/app/components/FavouriteButton";
 import OccurrenceDates from "@/app/components/OccurrenceDates";
+import { CardsSkeleton } from "@/app/components/Skeleton";
 
 interface CardsViewProps {
   groups: EventGroup[];
@@ -9,6 +10,7 @@ interface CardsViewProps {
   signedIn: boolean;
   favouriteEventIds: Set<string>;
   onToggleEventFavourite: (eventId: string) => void;
+  loading?: boolean;
 }
 
 export default function CardsView({
@@ -17,7 +19,15 @@ export default function CardsView({
   signedIn,
   favouriteEventIds,
   onToggleEventFavourite,
+  loading = false,
 }: CardsViewProps) {
+  // Ghost cards while AppShell's page/filter transition is pending —
+  // shown ahead of the error/empty checks since those reflect the
+  // previous (still-valid) result, not the in-flight one.
+  if (loading) {
+    return <CardsSkeleton count={15} />;
+  }
+
   if (error) {
     return (
       <div className="px-6 py-16">

@@ -10,10 +10,22 @@ const IDENTITY_BUCKETS = (Object.keys(BUCKET_LABELS) as BucketSlug[]).filter(
 
 const CATEGORIES = Object.entries(CATEGORY_LABELS) as [Category, string][];
 
+type SubmitMode = "manual" | "link" | "organiser";
+
 export default function SubmitPage() {
+  const [mode, setMode] = useState<SubmitMode>("manual");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // "link" mode
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkDescription, setLinkDescription] = useState("");
+
+  // "organiser" mode
+  const [organiserName, setOrganiserName] = useState("");
+  const [organiserLink, setOrganiserLink] = useState("");
+  const [organiserBio, setOrganiserBio] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -46,28 +58,42 @@ export default function SubmitPage() {
     setError(null);
     setLoading(true);
 
+    const payload =
+      mode === "link"
+        ? { mode, sourceUrl: linkUrl, description: linkDescription, _trap: trap }
+        : mode === "organiser"
+          ? {
+              mode,
+              organiserName,
+              sourceUrl: organiserLink,
+              description: organiserBio,
+              _trap: trap,
+            }
+          : {
+              mode,
+              title,
+              description: description || undefined,
+              startDate,
+              startTime: startTime || undefined,
+              endDate: endDate || undefined,
+              endTime: endTime || undefined,
+              venueName: venueName || undefined,
+              venueAddress: venueAddress || undefined,
+              venueCity: venueCity || undefined,
+              venuePostcode: venuePostcode || undefined,
+              category: category || null,
+              sourceUrl: sourceUrl || undefined,
+              isFree,
+              priceMin: !isFree && priceMin ? parseFloat(priceMin) : null,
+              selfBuckets: [...selfBuckets],
+              _trap: trap,
+            };
+
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description: description || undefined,
-          startDate,
-          startTime: startTime || undefined,
-          endDate: endDate || undefined,
-          endTime: endTime || undefined,
-          venueName: venueName || undefined,
-          venueAddress: venueAddress || undefined,
-          venueCity: venueCity || undefined,
-          venuePostcode: venuePostcode || undefined,
-          category: category || null,
-          sourceUrl: sourceUrl || undefined,
-          isFree,
-          priceMin: !isFree && priceMin ? parseFloat(priceMin) : null,
-          selfBuckets: [...selfBuckets],
-          _trap: trap,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const body = await res.json();
@@ -114,6 +140,126 @@ export default function SubmitPage() {
         </p>
       </div>
 
+      <div className="flex gap-1 rounded-md border border-zinc-300 p-1 dark:border-zinc-700">
+        {MODE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setMode(opt.value)}
+            className={[
+              "flex-1 rounded px-2 py-1.5 text-xs font-medium transition-colors",
+              mode === opt.value
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900",
+            ].join(" ")}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "link" && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Got a link to the event — an Instagram post, Eventbrite page, a poster on a venue&rsquo;s
+            site? Paste it below with a short description and we&rsquo;ll take it from there.
+          </p>
+
+          <Field label="Event link" required>
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              required
+              placeholder="https://..."
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Description" required>
+            <textarea
+              value={linkDescription}
+              onChange={(e) => setLinkDescription(e.target.value)}
+              maxLength={2000}
+              rows={5}
+              required
+              placeholder="What is this event? Who is it for? Any details from the link worth flagging."
+              className={inputCls}
+            />
+          </Field>
+
+          <Honeypot value={trap} onChange={setTrap} />
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {loading ? "Submitting…" : "Submit event"}
+          </button>
+        </form>
+      )}
+
+      {mode === "organiser" && (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Run events regularly? Give us a link to where people can find you — Instagram, TikTok,
+            Eventbrite, a linktree, whatever you use — and a description of the sort of events you
+            put on. We&rsquo;ll set up your organiser profile.
+          </p>
+
+          <Field label="Your name / collective name" required>
+            <input
+              type="text"
+              value={organiserName}
+              onChange={(e) => setOrganiserName(e.target.value)}
+              maxLength={200}
+              required
+              placeholder="e.g. Black Joy Collective"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Link" required>
+            <input
+              type="url"
+              value={organiserLink}
+              onChange={(e) => setOrganiserLink(e.target.value)}
+              required
+              placeholder="https://instagram.com/..."
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="What sort of events do you run?" required>
+            <textarea
+              value={organiserBio}
+              onChange={(e) => setOrganiserBio(e.target.value)}
+              maxLength={2000}
+              rows={5}
+              required
+              placeholder="e.g. Monthly queer social nights and pop-up markets across East London"
+              className={inputCls}
+            />
+          </Field>
+
+          <Honeypot value={trap} onChange={setTrap} />
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-md bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {loading ? "Submitting…" : "Submit organiser profile"}
+          </button>
+        </form>
+      )}
+
+      {mode === "manual" && (
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* ── Event details ── */}
         <fieldset className="flex flex-col gap-4">
@@ -312,16 +458,7 @@ export default function SubmitPage() {
           </div>
         </fieldset>
 
-        {/* Honeypot — hidden from real users via display:none, bots fill it */}
-        <input
-          type="text"
-          value={trap}
-          onChange={(e) => setTrap(e.target.value)}
-          tabIndex={-1}
-          aria-hidden="true"
-          autoComplete="off"
-          style={{ display: "none" }}
-        />
+        <Honeypot value={trap} onChange={setTrap} />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -333,7 +470,28 @@ export default function SubmitPage() {
           {loading ? "Submitting…" : "Submit event"}
         </button>
       </form>
+      )}
     </div>
+  );
+}
+
+const MODE_OPTIONS: { value: SubmitMode; label: string }[] = [
+  { value: "manual", label: "Manually" },
+  { value: "link", label: "Link to an event" },
+  { value: "organiser", label: "Be an organiser" },
+];
+
+function Honeypot({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      tabIndex={-1}
+      aria-hidden="true"
+      autoComplete="off"
+      style={{ display: "none" }}
+    />
   );
 }
 

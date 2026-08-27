@@ -27,6 +27,14 @@ interface Submission {
   event_buckets: SubmissionBucket[];
 }
 
+interface OrganiserSubmission {
+  id: string;
+  name: string;
+  profile_url: string | null;
+  bio: string | null;
+  created_at: string;
+}
+
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
     day: "numeric",
@@ -51,6 +59,7 @@ export default function AdminSubmissionsPage() {
   );
   const [secretInput, setSecretInput] = useState("");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [organiserSubmissions, setOrganiserSubmissions] = useState<OrganiserSubmission[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +82,7 @@ export default function AdminSubmissionsPage() {
         return;
       }
       setSubmissions(body.submissions);
+      setOrganiserSubmissions(body.organiserSubmissions ?? []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -97,6 +107,21 @@ export default function AdminSubmissionsPage() {
       return;
     }
     setSubmissions((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  async function handleOrganiserAction(id: string, action: "approve" | "reject") {
+    if (!secret) return;
+    const res = await fetch("/api/admin/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ organiserId: id, action }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError((body as { error?: string }).error ?? "Action failed.");
+      return;
+    }
+    setOrganiserSubmissions((prev) => prev.filter((s) => s.id !== id));
   }
 
   if (!secret) {
@@ -137,7 +162,7 @@ export default function AdminSubmissionsPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-black dark:text-zinc-50">
-          Community submissions ({submissions.length})
+          Community submissions ({submissions.length + organiserSubmissions.length})
         </h1>
         <button
           type="button"
@@ -150,7 +175,9 @@ export default function AdminSubmissionsPage() {
 
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Events submitted via /submit. Approve to publish; reject to delete. Self-tagged buckets
-        (confidence 1.0) pass the visibility gate immediately after approval.
+        (confidence 1.0) pass the visibility gate immediately after approval. Submissions made via
+        the &ldquo;link&rdquo; mode carry a placeholder title/date — visit the source link and
+        confirm the real details before approving.
       </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -167,6 +194,7 @@ export default function AdminSubmissionsPage() {
           const hasQualifyingBucket = buckets.some(
             (eb) => eb.confidence >= 0.8 || eb.assigned_by === "moderator"
           );
+          const dateUnconfirmed = (s.quality_flags ?? []).some((f) => f.startsWith("date not provided"));
 
           return (
             <li
@@ -180,8 +208,14 @@ export default function AdminSubmissionsPage() {
                   <p className="mt-0.5 text-xs text-zinc-500">
                     Submitted {formatDate(s.created_at)}
                     {" · "}
-                    Starts {formatDateTime(s.start_at)}
-                    {s.end_at && ` · Ends ${formatDateTime(s.end_at)}`}
+                    {dateUnconfirmed ? (
+                      <span className="text-amber-600 dark:text-amber-400">date unconfirmed — see link</span>
+                    ) : (
+                      <>
+                        Starts {formatDateTime(s.start_at)}
+                        {s.end_at && ` · Ends ${formatDateTime(s.end_at)}`}
+                      </>
+                    )}
                   </p>
 
                   {s.venues && (
@@ -282,6 +316,67 @@ export default function AdminSubmissionsPage() {
             </li>
           );
         })}
+      </ul>
+
+      <div className="mt-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
+          Organiser signups ({organiserSubmissions.length})
+        </h2>
+      </div>
+
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        People who submitted themselves via the &ldquo;Be an organiser&rdquo; option on /submit.
+        Approve to make their profile publicly visible and claimable.
+      </p>
+
+      {!loading && organiserSubmissions.length === 0 && (
+        <p className="text-sm text-zinc-500">No pending organiser signups.</p>
+      )}
+
+      <ul className="flex flex-col gap-4">
+        {organiserSubmissions.map((o) => (
+          <li
+            key={o.id}
+            className="flex items-start justify-between gap-4 rounded-md border border-zinc-200 p-4 dark:border-zinc-800"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-black dark:text-zinc-50">{o.name}</p>
+              <p className="mt-0.5 text-xs text-zinc-500">Submitted {formatDate(o.created_at)}</p>
+
+              {o.profile_url && (
+                <a
+                  href={o.profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 block truncate text-xs text-blue-600 underline underline-offset-2 dark:text-blue-400"
+                >
+                  {o.profile_url}
+                </a>
+              )}
+
+              {o.bio && (
+                <p className="mt-2 line-clamp-3 text-sm text-zinc-700 dark:text-zinc-300">{o.bio}</p>
+              )}
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleOrganiserAction(o.id, "approve")}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-700"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOrganiserAction(o.id, "reject")}
+                className="rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-700 dark:border-red-900 dark:text-red-400"
+              >
+                Reject
+              </button>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );

@@ -15,7 +15,8 @@ export type Category =
   | "workshop-talk"
   | "community-social"
   | "sports"
-  | "family-kids";
+  | "family-kids"
+  | "health-wellness";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   music: "Music",
@@ -27,6 +28,7 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   "community-social": "Community & Social",
   sports: "Sports",
   "family-kids": "Family & Kids",
+  "health-wellness": "Health & Wellness",
 };
 
 const CATEGORY_SET = new Set<string>(Object.keys(CATEGORY_LABELS));
@@ -68,6 +70,18 @@ const INFERENCE_RULES: Array<{ category: Category; phrases: string[] }> = [
       "live performance", "spoken word", "cabaret", "circus",
       "live art", "performance art", "choreography", "dance piece",
       "physical theatre", "drag performance", "drag show",
+    ],
+  },
+  {
+    // Checked ahead of workshop-talk's generic "workshop" phrase so e.g.
+    // "yoga workshop" resolves here rather than to Workshop & Talk.
+    category: "health-wellness",
+    phrases: [
+      "yoga", "meditation", "mindfulness", "wellbeing", "well-being",
+      "wellness", "breathwork", "sound bath", "sound healing", "pilates",
+      "tai chi", "qigong", "reiki", "self-care", "self care",
+      "mental health", "therapy session", "guided relaxation", "somatic",
+      "somatic healing", "movement practice", "ice bath", "sauna session",
     ],
   },
   {

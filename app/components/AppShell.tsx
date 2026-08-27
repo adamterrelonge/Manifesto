@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Header, { type ViewMode } from "@/app/components/Header";
 import Sidebar, { type FilterState, type HomeLocation, DEFAULT_FILTERS } from "@/app/components/Sidebar";
 import type { Category } from "@/lib/categories";
@@ -8,6 +8,7 @@ import { matchesDateFilter, type DateFilter } from "@/lib/date-filter";
 import EventsListView from "@/app/components/views/EventsListView";
 import MapView from "@/app/components/views/MapView";
 import CardsView from "@/app/components/views/CardsView";
+import Pagination from "@/app/components/Pagination";
 import type { EventListItem } from "@/lib/types";
 import { groupEvents } from "@/lib/group-events";
 import { useUser } from "@/lib/hooks/useUser";
@@ -78,11 +79,26 @@ function matchesSearch(event: EventListItem, query: string): boolean {
   );
 }
 
+// Cards/list views only ever show one page's worth of events at a time —
+// keeps the DOM small (up to ~1000 qualifying events can come back from
+// fetchQualifyingEvents) and gives the ghost-loading transition below
+// something worth showing.
+const EVENTS_PAGE_SIZE = 15;
+
 export default function AppShell({ events, error }: AppShellProps) {
   const [view, setView] = useState<ViewMode>("list");
   const [dateFilter, setDateFilter] = useState<DateFilter>("week");
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchQuery, setSearchQuery] = useState("");
+  // Kept separate from searchQuery so the search input stays perfectly
+  // responsive (never deferred) while the expensive filter/group recompute
+  // it drives can lag a frame behind and show a skeleton in the meantime.
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const searchIsPending = searchQuery !== deferredSearchQuery;
+
+  const [page, setPage] = useState(1);
+  const [isPending, startTransition] = useTransition();
+  const mainRef = useRef<HTMLElement>(null);
 
   const user = useUser();
   const [favouriteEventIds, setFavouriteEventIds] = useState<Set<string>>(new Set());
@@ -153,9 +169,9 @@ export default function AppShell({ events, error }: AppShellProps) {
       (event) =>
         matchesDateFilter(event.start_at, event.end_at, dateFilter, now) &&
         matchesFilters(event, filters, homeLocation) &&
-        matchesSearch(event, searchQuery)
+        matchesSearch(event, deferredSearchQuery)
     );
-  }, [events, dateFilter, filters, homeLocation, searchQuery]);
+  }, [events, dateFilter, filters, homeLocation, deferredSearchQuery]);
 
   // Collapses repeat occurrences of the same production (same title/venue/
   // category — e.g. a week of showtimes) into one listing with multiple
@@ -163,36 +179,88 @@ export default function AppShell({ events, error }: AppShellProps) {
   // identically and never disagrees about what's currently visible.
   const groupedEvents = useMemo(() => groupEvents(filteredEvents), [filteredEvents]);
 
+  // Whenever the underlying result set changes shape, the previously
+  // selected page number is no longer meaningful — jump back to page 1.
+  // Adjusting state during render (comparing against the last-seen key)
+  // rather than in a useEffect avoids the extra cascading render a
+  // post-commit setState would cause — see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const pageResetKey = `${dateFilter}::${JSON.stringify(filters)}::${deferredSearchQuery}::${view}`;
+  const [prevPageResetKey, setPrevPageResetKey] = useState(pageResetKey);
+  if (pageResetKey !== prevPageResetKey) {
+    setPrevPageResetKey(pageResetKey);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(groupedEvents.length / EVENTS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedEvents = useMemo(
+    () => groupedEvents.slice((currentPage - 1) * EVENTS_PAGE_SIZE, currentPage * EVENTS_PAGE_SIZE),
+    [groupedEvents, currentPage]
+  );
+
+  // Ghost/skeleton state: true for the brief window between a page/filter
+  // change being requested and its recompute (filtering + grouping,
+  // potentially over ~1000 events) actually landing.
+  const showSkeleton = isPending || searchIsPending;
+
+  function handleDateFilterChange(next: DateFilter) {
+    startTransition(() => setDateFilter(next));
+  }
+
+  function handleFiltersChange(next: FilterState) {
+    startTransition(() => setFilters(next));
+  }
+
+  function handleViewChange(next: ViewMode) {
+    startTransition(() => setView(next));
+  }
+
+  function handlePageChange(next: number) {
+    startTransition(() => setPage(next));
+    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="flex min-h-screen flex-1 flex-col">
       <Header
         view={view}
-        onViewChange={setView}
+        onViewChange={handleViewChange}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
       />
       <div className="flex flex-1">
         <Sidebar
           dateFilter={dateFilter}
-          onDateFilterChange={setDateFilter}
+          onDateFilterChange={handleDateFilterChange}
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={handleFiltersChange}
           homeLocation={homeLocation}
           onHomeLocationChange={setHomeLocation}
         />
-        <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-black">
+        <main ref={mainRef} className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-black">
           {view === "list" && (
-            <EventsListView
-              groups={groupedEvents}
-              error={error}
-              signedIn={!!user}
-              favouriteEventIds={favouriteEventIds}
-              favouriteVenueIds={favouriteVenueIds}
-              onToggleEventFavourite={toggleEventFavourite}
-              onToggleVenueFavourite={toggleVenueFavourite}
-              flaggedBucketKeys={flaggedBucketKeys}
-              onFlagBucket={flagBucket}
-            />
+            <>
+              <EventsListView
+                groups={pagedEvents}
+                error={error}
+                signedIn={!!user}
+                favouriteEventIds={favouriteEventIds}
+                favouriteVenueIds={favouriteVenueIds}
+                onToggleEventFavourite={toggleEventFavourite}
+                onToggleVenueFavourite={toggleVenueFavourite}
+                flaggedBucketKeys={flaggedBucketKeys}
+                onFlagBucket={flagBucket}
+                loading={showSkeleton}
+              />
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                totalItems={groupedEvents.length}
+                pageSize={EVENTS_PAGE_SIZE}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
           {view === "map" && (
             <MapView
@@ -206,13 +274,23 @@ export default function AppShell({ events, error }: AppShellProps) {
             />
           )}
           {view === "cards" && (
-            <CardsView
-              groups={groupedEvents}
-              error={error}
-              signedIn={!!user}
-              favouriteEventIds={favouriteEventIds}
-              onToggleEventFavourite={toggleEventFavourite}
-            />
+            <>
+              <CardsView
+                groups={pagedEvents}
+                error={error}
+                signedIn={!!user}
+                favouriteEventIds={favouriteEventIds}
+                onToggleEventFavourite={toggleEventFavourite}
+                loading={showSkeleton}
+              />
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                totalItems={groupedEvents.length}
+                pageSize={EVENTS_PAGE_SIZE}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
         </main>
       </div>

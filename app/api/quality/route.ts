@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isValidBearerSecret } from "@/lib/auth";
 import { runQualityScoring } from "@/lib/pipeline";
+import { QUALIFYING_EVENTS_CACHE_TAG } from "@/lib/events-query";
 
 // Mutating route (writes events.quality_score) — never prerender/cache.
 // Standalone trigger for re-running just this stage (e.g. after tuning
@@ -16,6 +18,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await runQualityScoring(createAdminClient());
+    revalidateTag(QUALIFYING_EVENTS_CACHE_TAG, "max");
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

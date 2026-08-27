@@ -10,6 +10,7 @@ const MAX_DESC = 2000;
 const MAX_FIELD = 200;
 
 interface SubmitBody {
+  mode?: "manual" | "link" | "organiser";
   title?: string;
   description?: string;
   startDate?: string;
@@ -25,7 +26,25 @@ interface SubmitBody {
   isFree?: boolean;
   priceMin?: number | null;
   selfBuckets?: string[];
+  // "organiser" mode:
+  organiserName?: string;
   _trap?: string;
+}
+
+// "link" mode has no title field — derive a short one from the description
+// (first sentence, or first MAX_TITLE chars) so the event row has something
+// human-readable in the admin queue until a moderator confirms it from the link.
+function deriveTitleFromDescription(description: string, fallbackUrl: string): string {
+  const trimmed = description.trim();
+  if (trimmed) {
+    const firstSentence = trimmed.split(/(?<=[.!?])\s/)[0];
+    return firstSentence.slice(0, MAX_TITLE);
+  }
+  try {
+    return `Event via ${new URL(fallbackUrl).hostname}`;
+  } catch {
+    return "Event via link";
+  }
 }
 
 function buildDateTime(date: string, time?: string): string | null {
@@ -52,22 +71,76 @@ export async function POST(request: NextRequest) {
   // Honeypot — bots that fill this field get a silent success, not an error.
   if (body._trap) return NextResponse.json({ ok: true });
 
-  const title = (body.title ?? "").trim().slice(0, MAX_TITLE);
-  if (!title) {
-    return NextResponse.json({ error: "Event name is required" }, { status: 400 });
-  }
-
-  const startAt = buildDateTime(body.startDate ?? "", body.startTime);
-  if (!startAt) {
-    return NextResponse.json({ error: "A valid start date is required" }, { status: 400 });
-  }
-
-  const endAt = body.endDate ? buildDateTime(body.endDate, body.endTime) : null;
-  const description = (body.description ?? "").trim().slice(0, MAX_DESC) || null;
-  const sourceUrl = (body.sourceUrl ?? "").trim().slice(0, MAX_FIELD) || null;
-  const venueName = (body.venueName ?? "").trim().slice(0, MAX_FIELD);
-
+  const mode = body.mode ?? "manual";
   const admin = createAdminClient();
+
+  // "organiser" mode isn't an event at all — it's a signup for the
+  // organisers table, held as status: "pending" until a moderator approves
+  // it on /admin/submissions (see 0017_organiser_signups.sql).
+  if (mode === "organiser") {
+    const organiserName = (body.organiserName ?? "").trim().slice(0, MAX_FIELD);
+    const profileUrl = (body.sourceUrl ?? "").trim().slice(0, MAX_FIELD);
+    const bio = (body.description ?? "").trim().slice(0, MAX_DESC) || null;
+
+    if (!organiserName) {
+      return NextResponse.json({ error: "Your name or collective name is required" }, { status: 400 });
+    }
+    if (!profileUrl) {
+      return NextResponse.json({ error: "A profile link is required" }, { status: 400 });
+    }
+
+    const { error: organiserError } = await admin.from("organisers").insert({
+      name: organiserName,
+      profile_url: profileUrl,
+      bio,
+      source_type: "manual",
+      status: "pending",
+    });
+
+    if (organiserError) {
+      console.error("Organiser submit error:", organiserError);
+      return NextResponse.json({ error: "Failed to save — please try again" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const sourceUrl = (body.sourceUrl ?? "").trim().slice(0, MAX_FIELD) || null;
+  const description = (body.description ?? "").trim().slice(0, MAX_DESC) || null;
+
+  // "link" mode only asks for a link + description — no title or date, so
+  // derive a placeholder title and flag the date as unconfirmed rather than
+  // rejecting the submission. A moderator confirms both from the link
+  // before approving on /admin/submissions.
+  let title: string;
+  let startAt: string;
+  let dateUnconfirmed = false;
+
+  if (mode === "link") {
+    if (!sourceUrl) {
+      return NextResponse.json({ error: "An event link is required" }, { status: 400 });
+    }
+    if (!description) {
+      return NextResponse.json({ error: "A short description is required" }, { status: 400 });
+    }
+    title = deriveTitleFromDescription(description, sourceUrl);
+    startAt = new Date().toISOString();
+    dateUnconfirmed = true;
+  } else {
+    title = (body.title ?? "").trim().slice(0, MAX_TITLE);
+    if (!title) {
+      return NextResponse.json({ error: "Event name is required" }, { status: 400 });
+    }
+
+    const builtStartAt = buildDateTime(body.startDate ?? "", body.startTime);
+    if (!builtStartAt) {
+      return NextResponse.json({ error: "A valid start date is required" }, { status: 400 });
+    }
+    startAt = builtStartAt;
+  }
+
+  const endAt = mode === "manual" && body.endDate ? buildDateTime(body.endDate, body.endTime) : null;
+  const venueName = mode === "manual" ? (body.venueName ?? "").trim().slice(0, MAX_FIELD) : "";
 
   // Venue — always insert a fresh row for manual submissions; the dedup
   // pipeline will merge with an existing venue on the next ingest run.
@@ -93,6 +166,7 @@ export async function POST(request: NextRequest) {
     venueId,
     imageUrl: null,
   });
+  if (dateUnconfirmed) flags.unshift("date not provided — confirm from the link before approving");
 
   const { data: event, error: eventError } = await admin
     .from("events")

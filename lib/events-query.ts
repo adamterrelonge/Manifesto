@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/server";
 import type { EventListItem } from "@/lib/types";
 import { NON_QUALIFYING_BUCKETS, HIGH_CONFIDENCE_THRESHOLD, type BucketSlug } from "@/lib/buckets";
@@ -8,13 +9,36 @@ export interface QualifyingEventsResult {
   error: string | null;
 }
 
+// Every mutating route that can change which events qualify (ingest and its
+// standalone dedup/classify/quality/expire stages, plus admin bucket
+// approve/reject) calls revalidateTag(QUALIFYING_EVENTS_CACHE_TAG) once its
+// write succeeds, so a fresh publish/approval shows up immediately instead
+// of waiting out the revalidate window below.
+export const QUALIFYING_EVENTS_CACHE_TAG = "qualifying-events";
+
 // The same "published, quality-scored, within the next 8 days, bucket-gated"
 // query app/page.tsx has always run — extracted so the city/region SEO
 // pages (app/events/**) share the exact bucket-gating logic instead of
 // re-implementing it slightly differently. This is the core product
 // invariant from docs/PROJECT_PLAN.md §9 ("bucket-tagging is a gate, not a
 // filter") — it must never drift between call sites.
-export async function fetchQualifyingEvents(): Promise<QualifyingEventsResult> {
+//
+// Wrapped in unstable_cache (60s) because six routes — the home page,
+// /events, /events/city/*, /events/region/*, and the sitemap — independently
+// call this, each re-running the full join against Supabase on every
+// request with no sharing between them. That's the main reason the site
+// felt slow even on localhost: load latency was dominated by waiting on the
+// remote DB, not Next.js rendering. This doesn't change page-level
+// rendering (app/page.tsx stays force-dynamic) — only the query result is
+// memoized, and revalidateTag calls on the mutating routes push fresh data
+// out immediately when it actually changes.
+export const fetchQualifyingEvents = unstable_cache(
+  fetchQualifyingEventsUncached,
+  ["qualifying-events"],
+  { tags: [QUALIFYING_EVENTS_CACHE_TAG], revalidate: 60 }
+);
+
+async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> {
   const supabase = createPublicClient();
 
   // Bounded by date range, not just row count: the sidebar's widest filter

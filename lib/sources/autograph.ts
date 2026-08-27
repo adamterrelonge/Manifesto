@@ -89,7 +89,15 @@ async function fetchDetail(path: string): Promise<AutographRawEvent> {
 
     const title = $("h1").first().text().trim() || slug;
     const description = $("meta[name='description']").attr("content") ?? null;
-    const imageUrl = $("meta[property='og:image']").attr("content") ?? null;
+
+    // No og:image meta tag exists on this site (checked live — absent on
+    // both /events/* and /exhibitions/* pages). The real banner is always
+    // rendered as an <img class="img-responsive"> instead; a second,
+    // src-less img.img-responsive is a lightbox modal template, so
+    // `[src]` + first() skips it and lands on the real banner.
+    const ogImage = $("meta[property='og:image']").attr("content");
+    const bannerSrc = $("img.img-responsive[src]").first().attr("src");
+    const imageUrl = ogImage || (bannerSrc ? new URL(bannerSrc, BASE_URL).toString() : null);
 
     // Find the first heading that contains a month name
     const dateText = ((): string | null => {

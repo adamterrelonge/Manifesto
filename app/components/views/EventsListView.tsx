@@ -1,9 +1,11 @@
 import type { EventGroup } from "@/lib/group-events";
 import { formatEventPrice } from "@/lib/format";
 import { categoryLabel } from "@/lib/categories";
+import { categoryPillClass, bucketPillClass } from "@/lib/pill-colors";
 import { GappedArrowIcon } from "@/app/components/icons";
 import FavouriteButton from "@/app/components/FavouriteButton";
 import OccurrenceDates from "@/app/components/OccurrenceDates";
+import { ListSkeleton } from "@/app/components/Skeleton";
 
 interface EventsListViewProps {
   groups: EventGroup[];
@@ -15,10 +17,12 @@ interface EventsListViewProps {
   onToggleVenueFavourite: (venueId: string) => void;
   flaggedBucketKeys: Set<string>;
   onFlagBucket: (eventId: string, bucketId: string) => void;
+  loading?: boolean;
 }
 
 interface BucketChipEntry {
   bucketId: string;
+  slug: string;
   label: string;
 }
 
@@ -34,7 +38,7 @@ function bucketChipEntries(group: EventGroup): BucketChipEntry[] {
   for (const eb of group.event_buckets) {
     if (!eb.buckets || eb.assigned_by === "rejected" || seen.has(eb.bucket_id)) continue;
     seen.add(eb.bucket_id);
-    entries.push({ bucketId: eb.bucket_id, label: eb.buckets.label });
+    entries.push({ bucketId: eb.bucket_id, slug: eb.buckets.slug, label: eb.buckets.label });
   }
   return entries.slice(0, 2);
 }
@@ -49,7 +53,15 @@ export default function EventsListView({
   onToggleVenueFavourite,
   flaggedBucketKeys,
   onFlagBucket,
+  loading = false,
 }: EventsListViewProps) {
+  // Ghost rows while AppShell's page/filter transition is pending — shown
+  // ahead of the error/empty checks since those reflect the previous
+  // (still-valid) result, not the in-flight one.
+  if (loading) {
+    return <ListSkeleton count={15} />;
+  }
+
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6">
       {error && (
@@ -140,16 +152,18 @@ export default function EventsListView({
                   {(category || bucketEntries.length > 0) && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {category && (
-                        <span className="rounded-full bg-[#1f271a]/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#1f271a]/80 dark:bg-white/10 dark:text-zinc-300">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${categoryPillClass(group.category)}`}
+                        >
                           {category}
                         </span>
                       )}
-                      {bucketEntries.map(({ bucketId, label }) => {
+                      {bucketEntries.map(({ bucketId, slug, label }) => {
                         const flagged = flaggedBucketKeys.has(`${group.primaryEventId}:${bucketId}`);
                         return (
                           <span
                             key={bucketId}
-                            className="inline-flex items-center gap-1 rounded-full bg-[#1f271a]/[0.06] px-2 py-0.5 text-[11px] font-medium text-[#1f271a]/80 dark:bg-white/10 dark:text-zinc-300"
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${bucketPillClass(slug)}`}
                           >
                             {label}
                             {signedIn && (

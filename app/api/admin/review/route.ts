@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NON_QUALIFYING_BUCKETS } from "@/lib/buckets";
 import { isValidBearerSecret } from "@/lib/auth";
+import { QUALIFYING_EVENTS_CACHE_TAG } from "@/lib/events-query";
 
 // Reads/writes event_buckets directly — never prerender/cache.
 export const dynamic = "force-dynamic";
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
       .eq("bucket_id", bucketId);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    revalidateTag(QUALIFYING_EVENTS_CACHE_TAG, "max");
     return NextResponse.json({ ok: true });
   }
 
@@ -99,5 +102,6 @@ export async function POST(request: NextRequest) {
     .eq("bucket_id", bucketId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateTag(QUALIFYING_EVENTS_CACHE_TAG, "max");
   return NextResponse.json({ ok: true });
 }
