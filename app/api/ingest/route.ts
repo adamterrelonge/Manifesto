@@ -188,6 +188,73 @@ import {
   fetchHenryMooreInstituteEvents,
   normaliseHenryMooreInstituteEvent,
 } from "@/lib/sources/henry-moore-institute";
+import { fetchFactLiverpoolEvents, normaliseFactLiverpoolEvent } from "@/lib/sources/fact-liverpool";
+import {
+  fetchLaingArtGalleryEvents,
+  normaliseLaingArtGalleryEvent,
+} from "@/lib/sources/laing-art-gallery";
+import { fetchHattonGalleryEvents, normaliseHattonGalleryEvent } from "@/lib/sources/hatton-gallery";
+import {
+  fetchGreatNorthMuseumEvents,
+  normaliseGreatNorthMuseumEvent,
+} from "@/lib/sources/great-north-museum";
+import {
+  fetchDiscoveryMuseumEvents,
+  normaliseDiscoveryMuseumEvent,
+} from "@/lib/sources/discovery-museum-newcastle";
+import { fetchBowesMuseumEvents, normaliseBowesMuseumEvent } from "@/lib/sources/bowes-museum";
+import {
+  fetchManchesterMuseumEvents,
+  normaliseManchesterMuseumEvent,
+} from "@/lib/sources/manchester-museum";
+import {
+  fetchRoyalPavilionMuseumsEvents,
+  normaliseRoyalPavilionMuseumsEvent,
+} from "@/lib/sources/royal-pavilion-museums";
+import {
+  fetchDeLaWarrPavilionEvents,
+  normaliseDeLaWarrPavilionEvent,
+} from "@/lib/sources/de-la-warr-pavilion";
+import {
+  fetchHastingsContemporaryEvents,
+  normaliseHastingsContemporaryEvent,
+} from "@/lib/sources/hastings-contemporary";
+import {
+  fetchVamSouthKensingtonEvents,
+  normaliseVamSouthKensingtonEvent,
+} from "@/lib/sources/vam-south-kensington";
+import {
+  fetchAmgueddfaCymruEvents,
+  normaliseAmgueddfaCymruEvent,
+} from "@/lib/sources/amgueddfa-cymru";
+import {
+  fetchAberdeenArtGalleryEvents,
+  normaliseAberdeenArtGalleryEvent,
+} from "@/lib/sources/aberdeen-art-gallery";
+import {
+  fetchLeicesterMuseumsEvents,
+  normaliseLeicesterMuseumsEvent,
+} from "@/lib/sources/leicester-museums";
+import {
+  fetchVictoriaArtGalleryEvents,
+  normaliseVictoriaArtGalleryEvent,
+} from "@/lib/sources/victoria-art-gallery";
+import {
+  fetchFitzwilliamMuseumEvents,
+  normaliseFitzwilliamMuseumEvent,
+} from "@/lib/sources/fitzwilliam-museum";
+import {
+  fetchHolburneMuseumEvents,
+  normaliseHolburneMuseumEvent,
+} from "@/lib/sources/holburne-museum";
+import {
+  fetchWolverhamptonArtGalleryEvents,
+  normaliseWolverhamptonArtGalleryEvent,
+} from "@/lib/sources/wolverhampton-art-gallery";
+import {
+  fetchNottinghamContemporaryEvents,
+  normaliseNottinghamContemporaryEvent,
+} from "@/lib/sources/nottingham-contemporary";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -1265,6 +1332,291 @@ async function ingestHenryMooreInstitute(admin: AdminClient): Promise<SourceResu
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestFactLiverpool(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchFactLiverpoolEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseFactLiverpoolEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestLaingArtGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchLaingArtGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseLaingArtGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestHattonGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchHattonGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseHattonGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestGreatNorthMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchGreatNorthMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseGreatNorthMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestDiscoveryMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchDiscoveryMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseDiscoveryMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestBowesMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchBowesMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseBowesMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestManchesterMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchManchesterMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseManchesterMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestRoyalPavilionMuseums(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchRoyalPavilionMuseumsEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseRoyalPavilionMuseumsEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestDeLaWarrPavilion(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchDeLaWarrPavilionEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseDeLaWarrPavilionEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestHastingsContemporary(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchHastingsContemporaryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseHastingsContemporaryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestVamSouthKensington(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchVamSouthKensingtonEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseVamSouthKensingtonEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestAmgueddfaCymru(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchAmgueddfaCymruEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseAmgueddfaCymruEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestAberdeenArtGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchAberdeenArtGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseAberdeenArtGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestLeicesterMuseums(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchLeicesterMuseumsEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseLeicesterMuseumsEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestVictoriaArtGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchVictoriaArtGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseVictoriaArtGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestFitzwilliamMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchFitzwilliamMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseFitzwilliamMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestHolburneMuseum(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchHolburneMuseumEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseHolburneMuseumEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestWolverhamptonArtGallery(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchWolverhamptonArtGalleryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseWolverhamptonArtGalleryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestNottinghamContemporary(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchNottinghamContemporaryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseNottinghamContemporaryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -1349,6 +1701,16 @@ export async function GET(request: NextRequest) {
     hunterian,
     kettlesYard,
     henryMooreInstitute,
+    factLiverpool,
+    laingArtGallery,
+    hattonGallery,
+    greatNorthMuseum,
+    discoveryMuseum,
+    bowesMuseum,
+    manchesterMuseum,
+    royalPavilionMuseums,
+    deLaWarrPavilion,
+    hastingsContemporary,
   ] = await Promise.all([
     runSource("barbican", () => ingestBarbican(admin)),
     runSource("eventbrite", () => ingestEventbrite(admin)),
@@ -1415,6 +1777,25 @@ export async function GET(request: NextRequest) {
     runSource("hunterian", () => ingestHunterian(admin)),
     runSource("kettles-yard", () => ingestKettlesYard(admin)),
     runSource("henry-moore-institute", () => ingestHenryMooreInstitute(admin)),
+    runSource("fact-liverpool", () => ingestFactLiverpool(admin)),
+    runSource("laing-art-gallery", () => ingestLaingArtGallery(admin)),
+    runSource("hatton-gallery", () => ingestHattonGallery(admin)),
+    runSource("great-north-museum", () => ingestGreatNorthMuseum(admin)),
+    runSource("discovery-museum-newcastle", () => ingestDiscoveryMuseum(admin)),
+    runSource("bowes-museum", () => ingestBowesMuseum(admin)),
+    runSource("manchester-museum", () => ingestManchesterMuseum(admin)),
+    runSource("royal-pavilion-museums", () => ingestRoyalPavilionMuseums(admin)),
+    runSource("de-la-warr-pavilion", () => ingestDeLaWarrPavilion(admin)),
+    runSource("hastings-contemporary", () => ingestHastingsContemporary(admin)),
+    runSource("vam-south-kensington", () => ingestVamSouthKensington(admin)),
+    runSource("amgueddfa-cymru", () => ingestAmgueddfaCymru(admin)),
+    runSource("aberdeen-art-gallery", () => ingestAberdeenArtGallery(admin)),
+    runSource("leicester-museums", () => ingestLeicesterMuseums(admin)),
+    runSource("victoria-art-gallery", () => ingestVictoriaArtGallery(admin)),
+    runSource("fitzwilliam-museum", () => ingestFitzwilliamMuseum(admin)),
+    runSource("holburne-museum", () => ingestHolburneMuseum(admin)),
+    runSource("wolverhampton-art-gallery", () => ingestWolverhamptonArtGallery(admin)),
+    runSource("nottingham-contemporary", () => ingestNottinghamContemporary(admin)),
   ]);
 
   // Sequential and isolated from here: expire first so dedup/classify/
@@ -1549,6 +1930,16 @@ export async function GET(request: NextRequest) {
       hunterian,
       kettlesYard,
       henryMooreInstitute,
+      factLiverpool,
+      laingArtGallery,
+      hattonGallery,
+      greatNorthMuseum,
+      discoveryMuseum,
+      bowesMuseum,
+      manchesterMuseum,
+      royalPavilionMuseums,
+      deLaWarrPavilion,
+      hastingsContemporary,
     },
     expiry,
     dedup,

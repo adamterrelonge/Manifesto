@@ -129,6 +129,67 @@ Before spending time building selectors for any entry below:
 | Kettle's Yard | ✅ Implemented (`lib/sources/kettles-yard.ts`) — Cambridge (University of Cambridge). Its `datetime` HTML attribute is free text, not ISO, so the text content is parsed instead. 12/12 events ingest cleanly |
 | Firstsite | ✅ Implemented (`lib/sources/firstsite.ts`) — Colchester. Best find of this round: `data-start-date`/`data-end-date` (YYYYMMDD) directly on each card, no free-text date parsing needed at all. 103 events ingest (includes long-running items back to 2023, left for downstream quality/expiry scoring same as every other adapter) |
 | National Museum Cardiff | ✅ Implemented (`lib/sources/national-museum-cardiff.ts`) — Cardiff (Amgueddfa Cymru / National Museum Wales). Free-text dates come in 5 shapes; only "From X" and explicit dash-separated ranges are parsed, the rest (recurring/list/vague text) are deliberately skipped rather than guessed. 4/22 events ingest cleanly |
+| FACT Liverpool | ✅ Implemented (`lib/sources/fact-liverpool.ts`) — Best find of round 5: unix-epoch `data-start`/`data-end` attrs directly on each `<article>`, no date-string parsing at all. 13/13 events ingest cleanly |
+| Laing Art Gallery | ✅ Implemented (`lib/sources/laing-art-gallery.ts`) — Newcastle. Tyne & Wear Archives & Museums' shared `northeastmuseums.org.uk` `/whats-on/search/-/-/-/-/-/<venue-id>` platform, also covers Hatton Gallery/Great North Museum/Discovery Museum below. Four date-text shapes handled, including "Until X" (no start given, treated as already running) and comma-separated recurring-occurrence lists (first date used) |
+| Hatton Gallery | ✅ Implemented (`lib/sources/hatton-gallery.ts`) — Newcastle University. Same northeastmuseums.org.uk platform as Laing, venue id 241 |
+| Great North Museum: Hancock | ✅ Implemented (`lib/sources/great-north-museum.ts`) — Newcastle. Same platform, venue id 240 |
+| Discovery Museum | ✅ Implemented (`lib/sources/discovery-museum-newcastle.ts`) — Newcastle. Same platform, venue id 239 |
+| The Bowes Museum | ✅ Implemented (`lib/sources/bowes-museum.ts`) — Barnard Castle. Returns `403` to curl but a clean `200` to Node's `fetch` — the opposite direction of the usual Cloudflare false-pass pattern elsewhere in this doc, confirmed fine since Vercel's runtime is Node. Includes an "LGBTQIA+ Object Trail". 12/12 events ingest cleanly |
+| Manchester Museum | ✅ Implemented (`lib/sources/manchester-museum.ts`) — University of Manchester. Squarespace-built `/events` — worth flagging since Squarespace blocked Doyle Wham/CasildART earlier in this doc for blog-post-only dates; this one has real `<time class="summary-metadata-item--date">` ranges, a counter-example not a pattern. 25/25 events ingest cleanly |
+| Royal Pavilion & Museums (Brighton & Hove Museums) | ✅ Implemented (`lib/sources/royal-pavilion-museums.ts`) — a 5-venue umbrella (Royal Pavilion & Garden, Brighton Museum & Art Gallery, Preston Manor & Gardens, Hove Museum of Creativity, Booth Museum of Natural History) on one `/whats-on/` listing, venue read per-card. 51/51 events ingest cleanly across all 5 venues |
+| De La Warr Pavilion | ✅ Implemented (`lib/sources/de-la-warr-pavilion.ts`) — Bexhill-on-Sea. Free-text `<h3>` date with a `<br/>` between start/end; many cards have no year on either side, inferred independently per side (accepted minor imprecision). 59/59 events ingest cleanly |
+| Hastings Contemporary | ✅ Implemented (`lib/sources/hastings-contemporary.ts`) — clean, consistently full-year `.event-date` text, no shorthand cases |
+| Victoria and Albert Museum (South Kensington + Young V&A) | ✅ Implemented (`lib/sources/vam-south-kensington.ts`) — best find of round 6: `/whatson` (distinct from `/east`, already scraped separately) carries full schema.org `Event` microdata as `<meta itemprop>` tags — ISO startDate/endDate, price/currency, nested `location` Place — no free-text date parsing anywhere. Covers a 6-venue umbrella (South Kensington, Young V&A, East Museum, East Storehouse, Online, Offsite); only the first two are ingested here to avoid double-ingesting the East venues `vam-east.ts` already covers. 40/40 events ingest cleanly, including an "LGBTQIA+ Tour" |
+| St Fagans, National Waterfront Museum, National Wool Museum, National Roman Legion Museum, National Slate Museum, Big Pit National Coal Museum (Amgueddfa Cymru) | ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) — the same `events_list_event` platform as `national-museum-cardiff.ts`, but its umbrella `/whatson/` page covers all 7 sites; Cardiff filtered out here since it already has its own adapter. 32/70 cards ingest (the rest are recurring/list-of-dates text deliberately left unparsed, same conservative rule as Cardiff's adapter, extended to also parse a bare single date) |
+| Aberdeen Art Gallery | ✅ Implemented (`lib/sources/aberdeen-art-gallery.ts`) — Drupal Views, server-rendered despite looking AJAX-driven at first glance. Three free-text date shapes plus a single-timed-date-before-a-comma case. Includes a dementia-friendly "Musical Memories" singing group — mission-relevant. 15/16 cards ingest (1 is a footer link, correctly filtered) |
+| Leicester Museum & Art Gallery, Newarke Houses Museum | ✅ Implemented (`lib/sources/leicester-museums.ts`) — Leicester City Council's `/whats-on/` covers both venues on one small (8-card) unpaginated page. Dates never carry a year; found and fixed a real bug during build — inferring each side's year independently pushed a start date 8 months in the past onto next year, producing start > end, fixed with a shared-year-from-end fallback (same technique then reused in nottingham-contemporary.ts) |
+| Victoria Art Gallery | ✅ Implemented (`lib/sources/victoria-art-gallery.ts`) — Bath & North East Somerset Council, Drupal Views. Found and fixed a real bug during build: the individual event is the inner `.views-col`, not the outer `.views-row` (a 3-column grid row) — the wrong selector was silently collapsing 3 cards into 1. Dates are a clean "X to Y" shape with a full year both sides. 11/11 events ingest, including a "Relaxed Hour" and a "BSL (British Sign Language) Exhibition Tour" — both mission-relevant |
+| The Fitzwilliam Museum | ✅ Implemented (`lib/sources/fitzwilliam-museum.ts`) — Cambridge. `/plan-your-visit/exhibitions` cards are mostly a bare "opens on" start date with no end (most exhibitions here run open-ended) plus a couple of explicit "X to Y" ranges. 9/9 events ingest |
+| Holburne Museum | ✅ Implemented (`lib/sources/holburne-museum.ts`) — Bath. WordPress "event" CPT archive, single free-text date per card, explicit `.c-archive-event__cost` field ("FREE" or a price). 2 of 6 cards have no date (recurring clubs) and are skipped. 4/6 events ingest |
+| Wolverhampton Art Gallery, Bantock House | ✅ Implemented (`lib/sources/wolverhampton-art-gallery.ts`) — City of Wolverhampton Council. Clean server-rendered `event-card` grid, venue given per-card, dates always carry a full year on both sides. 9/9 events ingest |
+| Nottingham Contemporary | ✅ Implemented (`lib/sources/nottingham-contemporary.ts`) — every card renders twice (a "Featured" section plus the full grid, same duplication pattern as `leeds-art-gallery.ts`), deduped by slug. Dates never carry a year and mix in recurrence/time text after a comma; the shared-year-from-end fallback (first used in `leicester-museums.ts`) correctly handles legitimate cross-year ranges like "Fri 9 Oct – Sun 10 Jan" while still fixing the same-year-but-already-past bug. 19 events ingest after dedup |
+| Djanogly Gallery (Lakeside Arts, Nottingham) | ❌ Attempted, blocked — the real `#events-section`/`#events-section-rest` containers are empty `<section>` tags in the raw HTML (client-side JS/AJAX populated); a "Featured" section does have one real card with a date but it's wrapped in `style="display:none"`, not a reliable source |
+| Courtauld Gallery | ❌ Attempted, blocked — `/whats-on/` has zero month-name or date-class content anywhere in the raw HTML; client-rendered |
+| National Science and Media Museum (Bradford) | ❌ Attempted, blocked — `/whats-on` has zero real date content in the raw HTML despite a permissive robots.txt; client-rendered |
+| The Box (Plymouth) | ❌ Attempted, blocked — `/whats-on` has zero real date content in the raw HTML; client-rendered |
+| Oriel Davies (Newtown) | ❌ Attempted, blocked — `/whats-on/` has zero real date content; the only "date" match in a first-pass scan was a Google Analytics deprecation-notice string, not event data |
+| Castlefield Gallery (Manchester) | 🔶 Re-attempted, still inconclusive — `/events/` has zero month-name/date-class content in the raw HTML, same as the round-4 first pass |
+| Open Eye Gallery (Liverpool) | 🔶 Re-attempted, still inconclusive — `/whatson/` is an 11.9KB stub with zero date content, same as the round-4 first pass |
+| Compton Verney (Warwickshire) | 🔶 Re-attempted, still inconclusive — the `data-start`/`data-end` attrs that looked promising in an automated heuristic scan turned out to be a slide-carousel widget's slide-index values ("201", "335"), not dates — confirms the round-4 finding rather than adding new information |
+| Ikon Gallery (Birmingham) | ❌ Attempted, blocked — `/whats-on` (268KB page) has zero real date/card content; the one month-name match was a "galleries reopen 29 September" closure-notice banner |
+| MOSTYN (Llandudno) | ❌ Attempted, blocked — intermittent Cloudflare "One moment, please..." JS challenge page returned to Node's `fetch` on repeat requests (a real page with content did come back on one earlier probe, confirming the block is a live challenge rather than a permanent redirect — not reliable enough to build against) |
+| Glynn Vivian Art Gallery (Swansea) | ❌ Attempted, blocked — `/whats-on/` has zero real date content; the only month-name matches were a jQuery UI datepicker widget's config array |
+| Grundy Art Gallery (Blackpool) | ❌ Attempted, blocked — `/whats-on/` body carries a `post-type-archive-event` class (WordPress "event" CPT) but the archive has zero server-rendered cards; only a client-side calendar widget's month-name array appears in the raw HTML |
+| Towner Eastbourne | ❌ Attempted, blocked — `/whats-on` cards are driven by an Alpine.js/Vue filter component (`@click`, `:class` directives); zero `/exhibitions/` or `/events/` links anywhere in the raw HTML confirms the actual listing is client-rendered |
+| Royal West of England Academy (RWA, Bristol) | ❌ Attempted, blocked — Shopify storefront; the homepage's `.slide__date` carousel is a curated teaser, and the real `/collections/events` grid turned out to be a `<script type="text/plain" data-product-template>` Mustache-style client-side template, not server-rendered markup |
+| Ashmolean Museum (Oxford) | 🔶 Not pursued further this round — `/exhibitions` returns `200` with real month-name text (6 matches) but wasn't inspected closely enough to confirm a scrapable card structure; worth a closer look in a future round |
+| Pitt Rivers Museum (Oxford) | 🔶 Not pursued further this round — `/events` returns `200` but zero month-name content in a first-pass scan; the "What's on" filtered URL variant wasn't checked |
+| London Museum (Smithfield) | 🔶 Not pursued — doesn't reopen until 28 November 2026; `/whats-on/` already returns `200` with some real content but the programme is not yet the live one, worth revisiting after opening |
+| Bristol Museum & Art Gallery, M Shed and other Bristol Museums venues | ❌ Not attempted — `robots.txt` explicitly blocks `ClaudeBot`/`GPTBot`/`CCBot`/`Amazonbot`/`Bytespider`/`Google-Extended`/`Applebot-Extended`/`meta-externalagent`/`CloudflareBrowserRenderingCrawler` via a Cloudflare "Content-Signal" block, same policy-block pattern as NPG/Wallace Collection |
+| RAMM (Royal Albert Memorial Museum, Exeter) | ❌ Not attempted — `robots.txt` explicitly blocks `ClaudeBot`/`anthropic-ai`/`GPTBot`/`openai`/etc. via an enormous named-bot blocklist, same policy-block pattern as NPG/Wallace Collection |
+| Ulster Museum, Ulster Folk Museum, Ulster Transport Museum (National Museums NI) | ❌ Attempted, blocked — Next.js app (`__NEXT_DATA__` present) but the embedded initial props are just homepage/nav content; `/whats-on`'s actual listing is fetched client-side after hydration, same pattern as `vam-dundee.ts`'s RSC approach but without the RSC stream actually containing the event data |
+| MAC (Metropolitan Arts Centre, Belfast) | ❌ Attempted, blocked — `/whats-on` has zero event/card/listing class names anywhere in the raw HTML; client-rendered |
+| CCA Derry~Londonderry | ❌ Attempted, blocked — `/exhibitions` returns only a paginated historical archive (all 36 dated entries found were from 2005–2011); no current/upcoming listing found on this URL in a first pass |
+| York Art Gallery | ❌ Attempted, blocked — `/whats-on/` has zero event/card class names in the raw HTML; robots.txt's own `Disallow: *ajaxCalendar*` and `?mo=`/`?yr=` rules independently confirm the real listing is an AJAX calendar widget |
+| Manchester Art Gallery | ❌ Attempted, blocked — `403` to Node's `fetch` on the homepage itself (Cloudflare/WAF), same failure mode as Royal Academy/Scottish National Gallery |
+| Norwich Castle Museum & Art Gallery | ❌ Attempted, blocked — `403` to Node's `fetch`, same Cloudflare/WAF pattern |
+| Heong Gallery (Downing College, Cambridge) | ❌ Attempted, blocked — `403` to Node's `fetch` on the college site |
+| Derby Museum and Art Gallery | ❌ Attempted, blocked — Gatsby SPA (`gatsby-script-loader`), zero server-rendered event content in the raw HTML, same pattern as Somerset House/IWM London |
+| Sheffield Museums Trust (Millennium Gallery, Graves Gallery) | 🔶 Attempted, inconclusive — `/whats-on/` returns `200` but is just navigation to per-venue pages with no card/date markup found in a first pass; not pursued further this round |
+| Castlefield Gallery | 🔶 Attempted, inconclusive — `/events/` has a `/wp-json/` route but not the Tribe Events Calendar API, and no month-name or numeric date text anywhere in the raw HTML; not pursued further this round |
+| Open Eye Gallery | 🔶 Attempted, inconclusive — same pattern as Castlefield Gallery, no date text found in `/whatson/`'s raw HTML; not pursued further this round |
+| Compton Verney | 🔶 Attempted, inconclusive — `.c-event-card__date` text is real but inconsistent (mixed 2-digit/4-digit years, "Now open", "Wed and Thu" with no date at all); not pursued further this round given the parsing effort required for a minority-format payoff |
+| Grundy Art Gallery | 🔶 Attempted, inconclusive — `/whats-on` returns `200` but only 114 bytes of content, effectively an empty stub page |
+| Fitzwilliam Museum | ✅ Round 6 revisit — `/plan-your-visit/exhibitions` (not `/whats-on`, which is a separate near-empty events page) has real server-rendered cards, see Status table below |
+| York Art Gallery, Science & Media Museum, Pitt Rivers Museum | ❌/🔶 Round 6 revisit — York Art Gallery confirmed blocked (AJAX calendar, robots.txt itself flags this); Science & Media Museum confirmed blocked (zero date content); Pitt Rivers still inconclusive, see Status table below |
+| Wolverhampton Art Gallery, New Walk Museum (Leicester Museums) | ✅ Round 6 revisit — both built, see Status table below |
+| Ashmolean Museum, Towner Eastbourne, Djanogly Gallery (Lakeside Arts) | ❌/🔶 Round 6 revisit — Towner Eastbourne and Djanogly Gallery confirmed client-rendered/blocked; Ashmolean still inconclusive, see Status table below |
+
+Round 5 (30-candidate sweep, resolved 2026-08-27): **10 verified-buildable (covering 14 venues), 4 hard-blocked (3× Cloudflare/WAF `403`, 1× client-rendered SPA), 5 inconclusive/not pursued, 11 not reached this round** — see the Status table above for full per-venue detail. All 10 adapters are wired into `/api/ingest`.
+
+Round 6 (30-candidate sweep, resolved 2026-08-28): pulled almost entirely from this doc's own long-standing candidate backlog rather than new research — the "not pursued this round" placeholders scattered through earlier rounds, plus a handful of newly-named national/regional venues (Amgueddfa Cymru's other 6 sites, Aberdeen, the two Bath galleries). Resolved **9 verified-buildable (covering 15 venues, ~147 events), 2 explicit AI-bot robots.txt blocks, and roughly 20 other blocked/inconclusive candidates** — see the Status table above for full per-venue detail. All 9 adapters are wired into `/api/ingest`.
+
+Two standout finds: V&A's own `/whatson` page (distinct from the `/east`-only page `vam-east.ts` already scraped) turned out to carry full schema.org `Event` microdata — ISO dates, price, a nested `location` Place — as plain `<meta itemprop>` tags, no free-text parsing anywhere, the cleanest source found in any round so far; and Amgueddfa Cymru's umbrella `/whatson/` page (already known to power `national-museum-cardiff.ts`) turned out to cover 6 more National Museum Wales sites on the exact same URL, for free. Two real parsing bugs were caught and fixed this round, both the same root cause: inferring a date range's start and end years independently can push a start date that's several months in the past onto *next* year while the end date (closer to "now") stays this year, producing start > end for any exhibition that opened earlier in the current year — fixed with a shared-year-from-end fallback (first applied in `leicester-museums.ts`, reused in `nottingham-contemporary.ts`, which also needed it to still correctly handle a legitimate Oct→Jan cross-year case in the same pass). Mission-relevant finds: Aberdeen's "Musical Memories" (a dementia-friendly singing group) and Victoria Art Gallery's "Relaxed Hour" and "BSL (British Sign Language) Exhibition Tour".
 
 ---
 
@@ -232,7 +293,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Tate Britain | ✅ Implemented (`lib/sources/tate.ts`) |
 | Tate Liverpool | Major redevelopment closure in progress — verify reopen status before building |
 | Tate St Ives | |
-| Victoria and Albert Museum (V&A) | Main South Kensington site not yet implemented. **V&A East** (Stratford) — ✅ Implemented (`lib/sources/vam-east.ts`) |
+| Victoria and Albert Museum (V&A) | South Kensington + Young V&A — ✅ Implemented (`lib/sources/vam-south-kensington.ts`). **V&A East** (Stratford) — ✅ Implemented (`lib/sources/vam-east.ts`) |
 | Natural History Museum | |
 | Science Museum | Part of Science Museum Group, alongside Science & Industry Museum (Manchester) and National Science and Media Museum (Bradford) |
 | Design Museum | |
@@ -328,18 +389,18 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | New Art Exchange | Nottingham | See community section above |
-| Nottingham Contemporary | Nottingham | 🔶 Attempted, inconclusive — `/whats-on/` returns `200` but no card/date markup found in a first pass; not pursued further this round |
-| Djanogly Gallery | Nottingham | |
-| New Walk Museum & Art Gallery | Leicester | |
+| Nottingham Contemporary | Nottingham | ✅ Implemented (`lib/sources/nottingham-contemporary.ts`) — round-4's first pass missed the abbreviated-weekday date text (`Sat 6 Jun`), which a full-month-name regex doesn't catch |
+| Djanogly Gallery | Nottingham | ❌ Blocked — client-rendered, see Status table above |
+| New Walk Museum & Art Gallery | Leicester | ✅ Implemented (`lib/sources/leicester-museums.ts`) |
 | Attenborough Arts Centre | Leicester | See community section above |
 | Derby Museum and Art Gallery | Derby | |
 | Birmingham Museum & Art Gallery | Birmingham | |
-| Ikon Gallery | Birmingham | 🔶 Attempted, inconclusive — `/whats-on/exhibitions` returns `200` but no `Event`/date/card/teaser class markup found in a first pass; not pursued further this round |
+| Ikon Gallery | Birmingham | ❌ Re-attempted, still blocked — `/whats-on` (268KB page) has zero real date/card content; the only month-name match was a closure-notice banner, see Status table above |
 | mac Birmingham | Birmingham | Midlands Art Centre — ✅ Implemented (`lib/sources/mac-birmingham.ts`) |
-| Wolverhampton Art Gallery | Wolverhampton | |
+| Wolverhampton Art Gallery | Wolverhampton | ✅ Implemented (`lib/sources/wolverhampton-art-gallery.ts`) — also covers Bantock House |
 | Herbert Art Gallery & Museum | Coventry | |
 | The New Art Gallery Walsall | Walsall | ✅ Implemented — see Status table above |
-| Compton Verney | Warwickshire | |
+| Compton Verney | Warwickshire | 🔶 Re-attempted, still inconclusive — see Status table above |
 
 ---
 
@@ -349,7 +410,7 @@ engagement programmes — likely highest event volume of any tier here.
 |---|---|---|
 | Sainsbury Centre | Norwich | UEA — ✅ Implemented (`lib/sources/sainsbury-centre.ts`) |
 | Norwich Castle Museum & Art Gallery | Norwich | |
-| Fitzwilliam Museum | Cambridge | |
+| Fitzwilliam Museum | Cambridge | ✅ Implemented (`lib/sources/fitzwilliam-museum.ts`) |
 | Kettle's Yard | Cambridge | ✅ Implemented (`lib/sources/kettles-yard.ts`) |
 | Firstsite | Colchester | ✅ Implemented (`lib/sources/firstsite.ts`) |
 | Heong Gallery | Cambridge | Downing College |
@@ -362,11 +423,11 @@ engagement programmes — likely highest event volume of any tier here.
 |---|---|---|
 | Turner Contemporary | Margate | ❌ Not attempted — robots.txt explicitly blocks `GPTBot` (and by the same policy block likely other AI crawlers) with `Disallow: /`; skipping per the operator's stated signal, same policy as NPG/NHM/Wallace Collection |
 | Pallant House Gallery | Chichester | ✅ Implemented (`lib/sources/pallant-house.ts`) — `/exhibitions` cards' `<time datetime>` attribute is always empty in practice, so the visible text is parsed instead; a "Spring 2027"-style unparseable end date degrades to a null `endAt` rather than dropping the event |
-| Towner Eastbourne | Eastbourne | |
+| Towner Eastbourne | Eastbourne | ❌ Attempted, blocked — `/whats-on` cards are Alpine.js/Vue-driven (`@click`, `:class`); zero real exhibition/event links in the raw HTML, see Status table above |
 | De La Warr Pavilion | Bexhill-on-Sea | |
-| Ashmolean Museum | Oxford | |
-| Modern Art Oxford | Oxford | |
-| Pitt Rivers Museum | Oxford | |
+| Ashmolean Museum | Oxford | 🔶 Not pursued further this round — `/exhibitions` has some real date text but wasn't inspected closely enough to confirm a scrapable structure |
+| Modern Art Oxford | Oxford | 🔶 Not pursued further this round — `/whats-on/` heuristic scan showed real `data-start`/`data-end` attrs and hundreds of month-name matches, a promising lead not yet followed up |
+| Pitt Rivers Museum | Oxford | 🔶 Not pursued further this round — `/events` reachable but zero date content found in a first pass |
 | Royal Pavilion & Museums | Brighton | |
 | ONCA Gallery | Brighton | Climate/environment-focused art — ❌ Blocked, org permanently wound down, see Status table above |
 | Fabrica | Brighton | ✅ Implemented (`lib/sources/fabrica.ts`) |
@@ -378,14 +439,14 @@ engagement programmes — likely highest event volume of any tier here.
 
 | Name | City | Notes |
 |---|---|---|
-| Bristol Museum & Art Gallery | Bristol | |
+| Bristol Museum & Art Gallery | Bristol | ❌ Not attempted — robots.txt explicitly blocks `ClaudeBot`/`GPTBot`/etc. via a Cloudflare "Content-Signal" block, see Status table above |
 | Arnolfini | Bristol | ✅ Implemented (`lib/sources/arnolfini.ts`) |
 | Spike Island | Bristol | ✅ Implemented (`lib/sources/spike-island.ts`) |
-| RWA (Royal West of England Academy) | Bristol | |
-| Holburne Museum | Bath | |
-| Victoria Art Gallery | Bath | |
-| RAMM (Royal Albert Memorial Museum) | Exeter | |
-| The Box | Plymouth | |
+| RWA (Royal West of England Academy) | Bristol | ❌ Attempted, blocked — client-rendered Shopify collection template, see Status table above |
+| Holburne Museum | Bath | ✅ Implemented (`lib/sources/holburne-museum.ts`) |
+| Victoria Art Gallery | Bath | ✅ Implemented (`lib/sources/victoria-art-gallery.ts`) |
+| RAMM (Royal Albert Memorial Museum) | Exeter | ❌ Not attempted — robots.txt explicitly blocks `ClaudeBot`/`anthropic-ai`/`GPTBot`/etc. via an enormous named-bot blocklist, see Status table above |
+| The Box | Plymouth | ❌ Attempted, blocked — zero real date content in the raw HTML, see Status table above |
 
 ---
 
@@ -399,7 +460,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Scottish National Gallery of Modern Art | Edinburgh | Modern One & Two — same `403` block as above |
 | Fruitmarket Gallery | Edinburgh | ✅ Implemented (`lib/sources/fruitmarket-gallery.ts`) |
 | Talbot Rice Gallery | Edinburgh | University of Edinburgh — ✅ Implemented (`lib/sources/talbot-rice-gallery.ts`) |
-| Stills | Edinburgh | Photography |
+| Stills | Edinburgh | Photography — 🔶 Attempted, inconclusive — `/exhibitions/` and `/events/` both return `200` with real month-name text but weren't inspected closely enough to confirm a scrapable card structure this round |
 | Kelvingrove Art Gallery and Museum | Glasgow | |
 | Gallery of Modern Art (GoMA) | Glasgow | ✅ Implemented (`lib/sources/goma.ts`) |
 | The Burrell Collection | Glasgow | ✅ Implemented (`lib/sources/burrell-collection.ts`) |
@@ -408,7 +469,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Street Level Photoworks | Glasgow | ✅ Implemented (`lib/sources/street-level-photoworks.ts`) |
 | Dundee Contemporary Arts (DCA) | Dundee | ✅ Implemented (`lib/sources/dca.ts`) |
 | V&A Dundee | Dundee | ✅ Implemented (`lib/sources/vam-dundee.ts`) — higher-risk RSC-stream extraction, see Status table above |
-| Aberdeen Art Gallery | Aberdeen | |
+| Aberdeen Art Gallery | Aberdeen | ✅ Implemented (`lib/sources/aberdeen-art-gallery.ts`) |
 
 ---
 
@@ -417,13 +478,17 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | National Museum Cardiff | Cardiff | Amgueddfa Cymru / National Museum Wales — ✅ Implemented (`lib/sources/national-museum-cardiff.ts`) |
-| St Fagans National Museum of History | Cardiff | Amgueddfa Cymru |
-| National Waterfront Museum | Swansea | Amgueddfa Cymru |
-| Glynn Vivian Art Gallery | Swansea | |
+| St Fagans National Museum of History | Cardiff | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| National Waterfront Museum | Swansea | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| National Wool Museum | Drefach Felindre | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| National Roman Legion Museum | Caerleon, Newport | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| National Slate Museum | Llanberis | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| Big Pit National Coal Museum | Blaenavon | Amgueddfa Cymru — ✅ Implemented (`lib/sources/amgueddfa-cymru.ts`) |
+| Glynn Vivian Art Gallery | Swansea | ❌ Blocked — `/whats-on/` has zero real date content, only a jQuery datepicker widget's config array, see Status table above |
 | Ffotogallery | Cardiff/Penarth | Photography — ❌ Blocked, AI-bot robots.txt block, see Status table above |
 | Chapter Arts Centre | Cardiff | ❌ Blocked, AI-bot robots.txt block, see Status table above |
-| MOSTYN | Llandudno | |
-| Oriel Davies | Newtown | |
+| MOSTYN | Llandudno | ❌ Blocked — intermittent Cloudflare JS challenge, see Status table above |
+| Oriel Davies | Newtown | ❌ Blocked — zero real date content, see Status table above |
 
 ---
 
@@ -431,12 +496,12 @@ engagement programmes — likely highest event volume of any tier here.
 
 | Name | City | Notes |
 |---|---|---|
-| Ulster Museum | Belfast | National Museums NI |
-| MAC (Metropolitan Arts Centre) | Belfast | |
+| Ulster Museum | Belfast | National Museums NI — ❌ Blocked, client-rendered (Next.js, but event data not in initial props), see Status table above |
+| MAC (Metropolitan Arts Centre) | Belfast | ❌ Blocked, client-rendered, see Status table above |
 | Golden Thread Gallery | Belfast | ✅ Implemented (`lib/sources/golden-thread-gallery.ts`) |
-| Ulster Folk Museum / Ulster Transport Museum | Cultra | National Museums NI |
+| Ulster Folk Museum / Ulster Transport Museum | Cultra | National Museums NI — ❌ Blocked, same NMNI backend as Ulster Museum |
 | Void Gallery | Derry/Londonderry | ❌ Blocked, client-rendered listing, see Status table above |
-| CCA Derry~Londonderry | Derry/Londonderry | |
+| CCA Derry~Londonderry | Derry/Londonderry | ❌ Blocked — `/exhibitions` only returns a historical archive (2005-2011), see Status table above |
 
 ---
 

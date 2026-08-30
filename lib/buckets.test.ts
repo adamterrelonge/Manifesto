@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyEventBuckets } from "@/lib/buckets";
+import { classifyEventBuckets, isGateQualifyingBucket } from "@/lib/buckets";
 
 describe("classifyEventBuckets", () => {
   it("matches nothing for generic text with no identity/accessibility signal", () => {
@@ -94,5 +94,24 @@ describe("classifyEventBuckets", () => {
       isFree: false,
     });
     expect(matches.some((m) => m.bucketSlug === "disability-friendly")).toBe(true);
+  });
+});
+
+describe("isGateQualifyingBucket", () => {
+  it("rejects accessibility-only buckets — they must pair with a real identity bucket", () => {
+    expect(isGateQualifyingBucket("disability-friendly")).toBe(false);
+    expect(isGateQualifyingBucket("autistic-friendly")).toBe(false);
+    expect(isGateQualifyingBucket("deaf-accessible")).toBe(false);
+  });
+
+  it("rejects cost-only buckets", () => {
+    expect(isGateQualifyingBucket("free-entry")).toBe(false);
+    expect(isGateQualifyingBucket("low-income-access")).toBe(false);
+  });
+
+  it("accepts real identity/community buckets", () => {
+    expect(isGateQualifyingBucket("black")).toBe(true);
+    expect(isGateQualifyingBucket("queer")).toBe(true);
+    expect(isGateQualifyingBucket("womxn-led")).toBe(true);
   });
 });

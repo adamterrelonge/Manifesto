@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/server";
 import type { EventListItem } from "@/lib/types";
-import { NON_QUALIFYING_BUCKETS, HIGH_CONFIDENCE_THRESHOLD, type BucketSlug } from "@/lib/buckets";
+import { isGateQualifyingBucket, HIGH_CONFIDENCE_THRESHOLD } from "@/lib/buckets";
 import { QUALITY_THRESHOLD } from "@/lib/quality";
 
 export interface QualifyingEventsResult {
@@ -52,9 +52,13 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
 
   // event_buckets!inner is a first-pass gate: it excludes events with zero
   // bucket matches at all. The JS filter below is the real "niche events
-  // only" gate — an event needs at least one bucket match that is (a) not
-  // in NON_QUALIFYING_BUCKETS (free-entry/low-income-access describe cost,
-  // not identity), and (b) either high-confidence or moderator-approved.
+  // only" gate — an event needs at least one bucket match that is (a) gate-
+  // qualifying per isGateQualifyingBucket (excludes cost buckets like
+  // free-entry, and excludes accessibility-only buckets like
+  // disability-friendly — see lib/buckets.ts's ACCESS_ONLY_BUCKETS comment;
+  // an event tagged only "disability-friendly" + a category like "music"
+  // must not qualify on its own, it needs a real identity/community bucket
+  // too), and (b) either high-confidence or moderator-approved.
   // A low-confidence keyword guess alone never makes an event public —
   // it sits in the admin review queue until a moderator approves it or a
   // stronger match arrives. See docs/PROJECT_PLAN.md §9.
@@ -82,7 +86,7 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
     event.event_buckets.some(
       (eb) =>
         eb.buckets &&
-        !NON_QUALIFYING_BUCKETS.includes(eb.buckets.slug as BucketSlug) &&
+        isGateQualifyingBucket(eb.buckets.slug) &&
         (eb.confidence >= HIGH_CONFIDENCE_THRESHOLD || eb.assigned_by === "moderator")
     )
   );

@@ -194,6 +194,23 @@ export function CommunityIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function AccessibilityIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...BASE_PROPS} {...props}>
+      <circle cx="14.8" cy="4.6" r="1.6" />
+      <path d="M14.8 6.3 13 10.6h4M13 10.6 9.3 11M13 10.6l3.6 3" />
+      <circle
+        cx="10"
+        cy="15.6"
+        r="6"
+        style={FILL_BOX_CENTER}
+        className="group-hover:[animation:sidebar-grid-pop_0.5s_ease-in-out]"
+      />
+      <circle cx="10" cy="15.6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...BASE_PROPS} {...props}>

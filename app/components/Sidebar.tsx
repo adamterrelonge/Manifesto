@@ -16,6 +16,7 @@ import {
   PriceIcon,
   CategoryIcon,
   CommunityIcon,
+  AccessibilityIcon,
   CalendarIcon,
   LocationPinIcon,
   LockIcon,
@@ -23,7 +24,7 @@ import {
   TrashIcon,
 } from "@/app/components/icons";
 import { CATEGORY_LABELS, type Category } from "@/lib/categories";
-import { BUCKET_LABELS, NON_QUALIFYING_BUCKETS, type BucketSlug } from "@/lib/buckets";
+import { BUCKET_LABELS, NON_QUALIFYING_BUCKETS, ACCESS_ONLY_BUCKETS, type BucketSlug } from "@/lib/buckets";
 import type { DateFilter } from "@/lib/date-filter";
 import type { EventListItem } from "@/lib/types";
 import { formatEventDate, formatEventPrice } from "@/lib/format";
@@ -89,11 +90,30 @@ export interface HomeLocation {
 
 const MAX_PRICE_CAP = 100;
 
+const byLabel = ([, a]: [BucketSlug, string], [, b]: [BucketSlug, string]) => a.localeCompare(b);
+
+// Sorted alphabetically by label per user request, not declaration order
+// (lib/categories.ts's declaration order matters elsewhere — it's
+// inferCategory's first-match-wins priority list — so the sort happens
+// here, at the filter-UI call site, rather than reordering that file).
+const SORTED_CATEGORY_ENTRIES = (Object.entries(CATEGORY_LABELS) as [Category, string][]).sort(
+  ([, a], [, b]) => a.localeCompare(b)
+);
+
 // Cost is already covered by the price slider — these describe access/cost,
 // not community, so they're left out of the Community checkbox list.
-const COMMUNITY_BUCKET_ENTRIES = (Object.entries(BUCKET_LABELS) as [BucketSlug, string][]).filter(
-  ([slug]) => !NON_QUALIFYING_BUCKETS.includes(slug)
-);
+// Accessibility buckets (disability/autistic/deaf) get their own separate
+// filter section below (ACCESSIBILITY_BUCKET_ENTRIES) rather than being
+// mixed in here — they describe a venue/event feature, not a community, per
+// lib/buckets.ts's ACCESS_ONLY_BUCKETS. Both lists are sorted alphabetically
+// by label, same reasoning as SORTED_CATEGORY_ENTRIES above.
+const COMMUNITY_BUCKET_ENTRIES = (Object.entries(BUCKET_LABELS) as [BucketSlug, string][])
+  .filter(([slug]) => !NON_QUALIFYING_BUCKETS.includes(slug) && !ACCESS_ONLY_BUCKETS.includes(slug))
+  .sort(byLabel);
+
+const ACCESSIBILITY_BUCKET_ENTRIES = (Object.entries(BUCKET_LABELS) as [BucketSlug, string][])
+  .filter(([slug]) => ACCESS_ONLY_BUCKETS.includes(slug))
+  .sort(byLabel);
 
 // Notification flags cover cost too ("free events" is an explicit ask) —
 // unlike the Community filter list, nothing is excluded here.
@@ -102,7 +122,7 @@ const ALL_BUCKET_ENTRIES = Object.entries(BUCKET_LABELS) as [BucketSlug, string]
 const DEFAULT_RADIUS_KM = 10;
 const MAX_RADIUS_KM = 50;
 
-type FilterSection = "price" | "category" | "community" | "location";
+type FilterSection = "price" | "category" | "community" | "accessibility" | "location";
 type SettingsSection = "location" | "notify";
 
 interface FilterSectionButtonProps {
@@ -201,6 +221,12 @@ interface SidebarProps {
   onFiltersChange: (filters: FilterState) => void;
   homeLocation: HomeLocation | null;
   onHomeLocationChange: (location: HomeLocation | null) => void;
+  // Below `md`, the sidebar is a slide-in drawer toggled from Header's
+  // top-left button rather than always-visible — isOpen/onClose only
+  // matter on that breakpoint; at `md` and up the sidebar ignores them and
+  // is always shown inline, same as before this existed.
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export default function Sidebar({
@@ -210,6 +236,8 @@ export default function Sidebar({
   onFiltersChange,
   homeLocation,
   onHomeLocationChange,
+  isOpen,
+  onClose,
 }: SidebarProps) {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   // Drives which detail content is rendered — deliberately NOT cleared when
@@ -580,9 +608,19 @@ export default function Sidebar({
     openFilterSection !== "category" && filters.categories.length > 0
       ? String(filters.categories.length)
       : null;
+  const selectedCommunityCount = filters.buckets.filter(
+    (b) => !ACCESS_ONLY_BUCKETS.includes(b as BucketSlug)
+  ).length;
+  const selectedAccessibilityCount = filters.buckets.filter((b) =>
+    ACCESS_ONLY_BUCKETS.includes(b as BucketSlug)
+  ).length;
   const communityBadge =
-    openFilterSection !== "community" && filters.buckets.length > 0
-      ? String(filters.buckets.length)
+    openFilterSection !== "community" && selectedCommunityCount > 0
+      ? String(selectedCommunityCount)
+      : null;
+  const accessibilityBadge =
+    openFilterSection !== "accessibility" && selectedAccessibilityCount > 0
+      ? String(selectedAccessibilityCount)
       : null;
   const locationBadge =
     openFilterSection !== "location" && filters.nearMeOnly ? "On" : null;
@@ -601,7 +639,30 @@ export default function Sidebar({
     null;
 
   return (
-    <aside className="w-80 shrink-0 overflow-hidden bg-[#ffffff] px-8 py-6 font-jbmono text-[#1f271a]">
+    <>
+      {/* Backdrop — mobile drawer only; desktop (md+) never renders this
+          since the sidebar there is always inline, never a drawer. */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] shrink-0 overflow-y-auto overflow-x-hidden bg-[#ffffff] px-8 py-6 font-jbmono text-[#1f271a] transition-transform duration-300 ease-in-out md:sticky md:top-14 md:z-auto md:h-[calc(100vh-3.5rem)] md:max-w-none md:translate-x-0 md:transition-none ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close filters"
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-[#1f271a]/50 transition-colors duration-200 hover:bg-[#1f271a]/5 hover:text-[#1f271a] md:hidden"
+        >
+          <span aria-hidden className="text-xl leading-none">×</span>
+        </button>
 
       {/* ── Auth box ── */}
       <button
@@ -775,23 +836,21 @@ export default function Sidebar({
                     />
                     {openFilterSection === "category" && (
                       <div className="mt-3 flex flex-col gap-1.5 pl-9">
-                        {(Object.entries(CATEGORY_LABELS) as [Category, string][]).map(
-                          ([slug, catLabel]) => (
-                            <label key={slug} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={filters.categories.includes(slug)}
-                                onChange={() => {
-                                  const next = filters.categories.includes(slug)
-                                    ? filters.categories.filter((c) => c !== slug)
-                                    : [...filters.categories, slug];
-                                  onFiltersChange({ ...filters, categories: next });
-                                }}
-                              />
-                              {catLabel}
-                            </label>
-                          )
-                        )}
+                        {SORTED_CATEGORY_ENTRIES.map(([slug, catLabel]) => (
+                          <label key={slug} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={filters.categories.includes(slug)}
+                              onChange={() => {
+                                const next = filters.categories.includes(slug)
+                                  ? filters.categories.filter((c) => c !== slug)
+                                  : [...filters.categories, slug];
+                                onFiltersChange({ ...filters, categories: next });
+                              }}
+                            />
+                            {catLabel}
+                          </label>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -825,6 +884,38 @@ export default function Sidebar({
                                 // own, so it needs an explicit custom event
                                 // to answer the other half of docs/PROJECT_PLAN.md
                                 // Phase 6's "which buckets ... get engagement" goal.
+                                track("bucket_filter", { bucket: slug, enabled: enabling });
+                              }}
+                            />
+                            {bucketLabel}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <FilterSectionButton
+                      label="Accessibility"
+                      icon={AccessibilityIcon}
+                      isLast={false}
+                      isOpen={openFilterSection === "accessibility"}
+                      badge={accessibilityBadge}
+                      onClick={() => toggleFilterSection("accessibility")}
+                    />
+                    {openFilterSection === "accessibility" && (
+                      <div className="mt-3 flex flex-col gap-1.5 pl-9">
+                        {ACCESSIBILITY_BUCKET_ENTRIES.map(([slug, bucketLabel]) => (
+                          <label key={slug} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={filters.buckets.includes(slug)}
+                              onChange={() => {
+                                const enabling = !filters.buckets.includes(slug);
+                                const next = enabling
+                                  ? [...filters.buckets, slug]
+                                  : filters.buckets.filter((b) => b !== slug);
+                                onFiltersChange({ ...filters, buckets: next });
                                 track("bucket_filter", { bucket: slug, enabled: enabling });
                               }}
                             />
@@ -1335,6 +1426,7 @@ export default function Sidebar({
           </div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

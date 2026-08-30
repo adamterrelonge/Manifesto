@@ -27,6 +27,17 @@ export type BucketSlug =
 
 export const HIGH_CONFIDENCE_THRESHOLD = 0.8;
 
+// A match this certain skips the manual admin review queue entirely —
+// lib/pipeline.ts's runClassification writes it straight in as
+// assigned_by: "moderator" (the same state a human approval sets), rather
+// than leaving it to pile up as one more row someone has to click through.
+// Distinct from HIGH_CONFIDENCE_THRESHOLD (0.8), which only controls public
+// visibility (lib/events-query.ts) — this is stricter, and only about
+// whether a human still needs to look at it. Only phrases/sources that are
+// effectively unambiguous should use 0.95+ (e.g. lib/venue-accessibility.ts's
+// fixed 0.95, or explicit unambiguous phrases like "lgbtq+"/"black-led").
+export const AUTO_APPROVE_THRESHOLD = 0.95;
+
 interface KeywordRule {
   phrase: string;
   confidence: number;
@@ -363,3 +374,31 @@ export const BUCKET_LABELS: Record<BucketSlug, string> = {
 // "niche events only" gate in app/page.tsx. They're still valid enrichment
 // tags shown alongside a real identity/accessibility match.
 export const NON_QUALIFYING_BUCKETS: BucketSlug[] = ["free-entry", "low-income-access"];
+
+// These describe a physical/sensory accessibility feature of the *venue or
+// event itself*, not the community it's for — most public venues have a
+// step-free entrance or an accessible toilet as a matter of course (see
+// lib/venue-accessibility.ts), so "wheelchair accessible" alone says
+// nothing about who the event is actually aimed at. Per product decision,
+// an event needs a real identity/community bucket match (black, queer,
+// womxn-led, ...) to pass the "niche events only" gate — one of these
+// alone, or several of these together with no identity bucket, is not
+// enough. They're still valid enrichment tags shown alongside a
+// qualifying match. Kept separate from NON_QUALIFYING_BUCKETS (which is
+// about cost, not accessibility) so call sites that only care about cost —
+// e.g. the Sidebar "Community" filter list — aren't affected by this rule.
+export const ACCESS_ONLY_BUCKETS: BucketSlug[] = [
+  "disability-friendly",
+  "autistic-friendly",
+  "deaf-accessible",
+];
+
+// Shared by lib/events-query.ts's "niche events only" gate and anywhere
+// else that needs to know whether a single bucket match is, by itself,
+// sufficient signal that an event belongs in front of users.
+export function isGateQualifyingBucket(slug: string): boolean {
+  return (
+    !NON_QUALIFYING_BUCKETS.includes(slug as BucketSlug) &&
+    !ACCESS_ONLY_BUCKETS.includes(slug as BucketSlug)
+  );
+}

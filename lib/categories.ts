@@ -52,6 +52,10 @@ const INFERENCE_RULES: Array<{ category: Category; phrases: string[] }> = [
       "film screening", "film programme", "film program", "film club",
       "cinema screening", "screening of", "documentary screening",
       "moving image", "video art", "short films", "feature film",
+      // UK BBFC age-certificate notation (e.g. "Bouchra (15)") — used
+      // almost exclusively in cinema/screening listings, so a reliable
+      // film signal on its own even when the copy never says "film".
+      "(u)", "(pg)", "(12a)", "(12)", "(15)", "(18)",
     ],
   },
   {
@@ -99,7 +103,7 @@ const INFERENCE_RULES: Array<{ category: Category; phrases: string[] }> = [
     phrases: [
       "art fair", "craft fair", "makers market", "makers fair",
       "book fair", "pop-up market", "flea market", "bazaar",
-      "open market",
+      "open market", "market",
     ],
   },
   {
@@ -131,13 +135,30 @@ const INFERENCE_RULES: Array<{ category: Category; phrases: string[] }> = [
   },
 ];
 
+// Word-boundary match, not a plain substring check — added after a bare
+// "market" phrase (for "African & Caribbean Market") turned out to also
+// match "supermarket" and would have matched "marketing" too. Mirrors
+// lib/buckets.ts's matchesPhrase; kept as a separate copy since this file
+// is deliberately decoupled from the identity/accessibility bucket
+// classifier (see this file's header comment).
+function matchesPhrase(text: string, phrase: string): boolean {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const startsWithWordChar = /\w/.test(phrase[0]);
+  const endsWithWordChar = /\w/.test(phrase[phrase.length - 1]);
+  const pattern = new RegExp(
+    `${startsWithWordChar ? "\\b" : ""}${escaped}${endsWithWordChar ? "\\b" : ""}`,
+    "i"
+  );
+  return pattern.test(text);
+}
+
 export function inferCategory(
   title: string,
   description: string | null
 ): Category | null {
   const haystack = `${title} ${description ?? ""}`.toLowerCase();
   for (const { category, phrases } of INFERENCE_RULES) {
-    if (phrases.some((p) => haystack.includes(p))) return category;
+    if (phrases.some((p) => matchesPhrase(haystack, p))) return category;
   }
   return null;
 }

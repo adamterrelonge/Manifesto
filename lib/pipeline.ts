@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { classifyEventBuckets } from "@/lib/buckets";
+import { classifyEventBuckets, AUTO_APPROVE_THRESHOLD } from "@/lib/buckets";
+import { venueAccessibilityMatches } from "@/lib/venue-accessibility";
 import { inferCategory } from "@/lib/categories";
 import { scoreEventQuality } from "@/lib/quality";
 
@@ -63,14 +64,23 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
     (buckets ?? []).map((b) => [b.slug as string, b.id as string])
   );
 
-  const events: { id: string; title: string; description: string | null; is_free: boolean }[] = [];
+  interface EventForClassification {
+    id: string;
+    title: string;
+    description: string | null;
+    is_free: boolean;
+    venues: { name: string } | null;
+  }
+
+  const events: EventForClassification[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await admin
       .from("events")
-      .select("id, title, description, is_free")
+      .select("id, title, description, is_free, venues(name)")
       .eq("status", "published")
       .eq("is_duplicate", false)
-      .range(offset, offset + PAGE_SIZE - 1);
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<EventForClassification[]>();
     if (error) throw new Error(error.message);
     events.push(...(data ?? []));
     if (!data || data.length < PAGE_SIZE) break;
@@ -101,15 +111,33 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
   const errors: string[] = [];
 
   for (const event of events) {
-    const matches = classifyEventBuckets({
+    const keywordMatches = classifyEventBuckets({
       title: event.title,
       description: event.description,
       isFree: event.is_free,
     });
-    if (matches.length === 0) continue;
+    const accessMatches = venueAccessibilityMatches(event.venues?.name);
+    if (keywordMatches.length === 0 && accessMatches.length === 0) continue;
 
-    const rows = matches
-      .map((match) => {
+    // Keyword and venue-accessibility can both match the same bucket (e.g.
+    // an event's own copy says "wheelchair accessible" for a venue this
+    // module also knows is step-free) — a single upsert can't touch the
+    // same (event_id, bucket_id) conflict key twice, so keep only the
+    // higher-confidence match per bucket, preferring keyword on a tie
+    // since its evidence is specific to this event.
+    const bestByBucket = new Map<string, { match: (typeof keywordMatches)[number]; assignedBy: "keyword" | "venue-accessibility" }>();
+    for (const match of keywordMatches) {
+      bestByBucket.set(match.bucketSlug, { match, assignedBy: "keyword" });
+    }
+    for (const match of accessMatches) {
+      const existing = bestByBucket.get(match.bucketSlug);
+      if (!existing || match.confidence > existing.match.confidence) {
+        bestByBucket.set(match.bucketSlug, { match, assignedBy: "venue-accessibility" });
+      }
+    }
+
+    const rows = Array.from(bestByBucket.values())
+      .map(({ match, assignedBy }) => {
         const bucketId = bucketIdBySlug.get(match.bucketSlug);
         if (!bucketId) return null;
         if (lockedPairs.has(`${event.id}:${bucketId}`)) return null;
@@ -118,7 +146,11 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
           bucket_id: bucketId,
           confidence: match.confidence,
           evidence: match.evidence,
-          assigned_by: "keyword",
+          // A match this certain skips the manual admin review queue —
+          // written straight in as "moderator" (the same state a human
+          // approval sets) rather than sitting there as one more row to
+          // click through. See lib/buckets.ts's AUTO_APPROVE_THRESHOLD.
+          assigned_by: match.confidence >= AUTO_APPROVE_THRESHOLD ? "moderator" : assignedBy,
         };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);

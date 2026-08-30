@@ -1,6 +1,7 @@
 import type { EventGroup } from "@/lib/group-events";
 import { formatEventPrice } from "@/lib/format";
 import { categoryLabel } from "@/lib/categories";
+import { isGateQualifyingBucket } from "@/lib/buckets";
 import { categoryPillClass, bucketPillClass } from "@/lib/pill-colors";
 import { GappedArrowIcon } from "@/app/components/icons";
 import FavouriteButton from "@/app/components/FavouriteButton";
@@ -40,6 +41,16 @@ function bucketChipEntries(group: EventGroup): BucketChipEntry[] {
     seen.add(eb.bucket_id);
     entries.push({ bucketId: eb.bucket_id, slug: eb.buckets.slug, label: eb.buckets.label });
   }
+  // Show whichever bucket(s) actually qualified this event for the gated
+  // feed first (lib/buckets.ts's isGateQualifyingBucket — identity/
+  // community tags, not cost or venue-accessibility enrichment). The join
+  // this reads from carries no guaranteed order, so without this the
+  // 2-pill cap below can silently drop the one tag that's the actual
+  // reason the event is here in favour of e.g. two venue-accessibility
+  // pills, making the event look mistagged.
+  entries.sort(
+    (a, b) => Number(!isGateQualifyingBucket(a.slug)) - Number(!isGateQualifyingBucket(b.slug))
+  );
   return entries.slice(0, 2);
 }
 

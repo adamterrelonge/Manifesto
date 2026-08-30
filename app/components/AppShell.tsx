@@ -99,6 +99,10 @@ export default function AppShell({ events, error }: AppShellProps) {
   const [page, setPage] = useState(1);
   const [isPending, startTransition] = useTransition();
   const mainRef = useRef<HTMLElement>(null);
+  // Sidebar is always visible at md+ (Sidebar itself ignores this prop
+  // there) — this only drives the mobile slide-in drawer, toggled from
+  // Header's top-left button.
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const user = useUser();
   const [favouriteEventIds, setFavouriteEventIds] = useState<Set<string>>(new Set());
@@ -228,6 +232,7 @@ export default function AppShell({ events, error }: AppShellProps) {
         onViewChange={handleViewChange}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        onMenuClick={() => setMobileSidebarOpen(true)}
       />
       <div className="flex flex-1">
         <Sidebar
@@ -237,6 +242,8 @@ export default function AppShell({ events, error }: AppShellProps) {
           onFiltersChange={handleFiltersChange}
           homeLocation={homeLocation}
           onHomeLocationChange={setHomeLocation}
+          isOpen={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
         />
         <main ref={mainRef} className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-black">
           {view === "list" && (
