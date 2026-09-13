@@ -55,6 +55,37 @@ function isFreeFromLabels(labels: Array<{ text?: string }> = []): boolean {
   return labels.some((l) => /\bfree\b/i.test(l.text ?? ""));
 }
 
+// Wellcome's own event data already carries structured accessibility
+// labels (e.g. "Relaxed", "British Sign Language interpreted",
+// "Speech-to-text") that lib/buckets.ts's keyword classifier can pick up —
+// but only the promo caption was ever fed into the description, so this
+// signal was silently dropped before classification ever saw it. Folding
+// the labels in here instead of hardcoding them onto VENUE means any event
+// tagged this way (not just "Memories of Care") benefits.
+const LABEL_TEXT_OVERRIDES: Record<string, string> = {
+  // Bare "Relaxed" alone isn't a bucket keyword (see buckets.ts) since
+  // it's too ambiguous a word to match globally — rephrased here to hit
+  // the existing "sensory-friendly" phrase instead. Every other label is
+  // passed through verbatim against phrases buckets.ts already has (or
+  // gained in this same change, e.g. "british sign language").
+  Relaxed: "Relaxed session (sensory-friendly)",
+};
+
+function describeLabels(labels: Array<{ text?: string }> = []): string | null {
+  const seen = new Set<string>();
+  const texts: string[] = [];
+  for (const l of labels) {
+    if (!l.text || seen.has(l.text)) continue;
+    seen.add(l.text);
+    texts.push(LABEL_TEXT_OVERRIDES[l.text] ?? l.text);
+  }
+  return texts.length > 0 ? `Accessibility: ${texts.join(", ")}.` : null;
+}
+
+function withLabelDescription(caption: string | null, labels: Array<{ text?: string }>): string | null {
+  return [caption, describeLabels(labels)].filter((s): s is string => Boolean(s)).join(" ") || null;
+}
+
 function parseWCDate(d: WCDateTime | undefined): string | null {
   if (!d?.value) return null;
   const parsed = new Date(d.value);
@@ -68,14 +99,15 @@ function eventFromWCEvent(e: WCEvent): WellcomeRawEvent | null {
   const startAt = parseWCDate(times[0]?.range?.startDateTime);
   const endAt = parseWCDate(times[times.length - 1]?.range?.endDateTime);
   if (!startAt) return null;
+  const labels = [...(e.labels ?? []), ...(e.secondaryLabels ?? [])];
   return {
     uid: e.uid,
     title: e.title,
-    description: e.promo?.caption ?? null,
+    description: withLabelDescription(e.promo?.caption ?? null, labels),
     imageUrl: e.image?.contentUrl ?? e.promo?.image?.contentUrl ?? null,
     startAt,
     endAt,
-    isFree: isFreeFromLabels([...(e.labels ?? []), ...(e.secondaryLabels ?? [])]),
+    isFree: isFreeFromLabels(labels),
     url: `${BASE_URL}/events/${e.uid}`,
   };
 }
@@ -89,7 +121,7 @@ function eventFromWCExhibition(e: WCExhibition, now: Date): WellcomeRawEvent | n
   return {
     uid: `exhibition-${e.uid}`,
     title: e.title,
-    description: e.promo?.caption ?? null,
+    description: withLabelDescription(e.promo?.caption ?? null, e.labels ?? []),
     imageUrl: e.image?.contentUrl ?? e.promo?.image?.contentUrl ?? null,
     startAt,
     endAt,

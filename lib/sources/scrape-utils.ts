@@ -97,6 +97,33 @@ export function applyTime(date: Date, timeStr: string): Date {
   return d;
 }
 
+// "8 – 13 September 2026" (full range), "15 – 19 September" (day-only
+// start, shared month, year inferred), or "13 September 2026" (single
+// date, no dash). The year only ever appears once, on the end/single side
+// — parsed first and reused for the start. Same shape as several venues'
+// own bespoke date parsers in this codebase (e.g. ica.ts's exhibition
+// dates, leicester-museums.ts) — pulled out here since three new adapters
+// need the identical logic rather than each carrying its own copy.
+export function parseDayRange(text: string): { startAt: Date | null; endAt: Date | null } {
+  const clean = text.replace(/\s+/g, " ").trim();
+  const dashMatch = clean.match(/^(.+?)\s*[–-]\s*(.+)$/);
+  if (!dashMatch) {
+    const single = parseDMY(clean);
+    return { startAt: single, endAt: null };
+  }
+
+  const [, leftRaw, rightRaw] = dashMatch;
+  const end = parseDMY(rightRaw);
+  if (!end) return { startAt: null, endAt: null };
+
+  const dayOnly = leftRaw.trim().match(/^(\d{1,2})$/);
+  const start = dayOnly
+    ? new Date(end.getFullYear(), end.getMonth(), parseInt(dayOnly[1], 10))
+    : parseDMY(leftRaw, end.getFullYear());
+
+  return { startAt: start ?? end, endAt: end };
+}
+
 export async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,

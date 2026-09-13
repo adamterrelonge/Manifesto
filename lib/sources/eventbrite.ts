@@ -87,28 +87,43 @@ export interface EventbriteEventWithOrganiser {
   event: EventbriteRawEvent;
 }
 
-export async function fetchAllEventbriteEvents(): Promise<
-  EventbriteEventWithOrganiser[]
-> {
+export interface EventbriteFetchResult {
+  events: EventbriteEventWithOrganiser[];
+  // Per-organiser failures (bad/stale id, API error, etc). Previously a
+  // single organiser throwing here aborted the whole function, silently
+  // discarding every other organiser's events for the run — confirmed live
+  // 2026-09-11 when one dead id (an org that had moved to a new Eventbrite
+  // profile) zeroed out all ~93 organisers' worth of events, not just its
+  // own. Each organiser's fetch is now isolated so one bad id degrades
+  // gracefully instead of taking the entire source down.
+  errors: string[];
+}
+
+export async function fetchAllEventbriteEvents(): Promise<EventbriteFetchResult> {
   const results: EventbriteEventWithOrganiser[] = [];
+  const errors: string[] = [];
 
   for (const organiser of EVENTBRITE_ORGANISERS) {
-    let continuation: string | undefined;
-    do {
-      const page = await fetchEventbriteOrganiserEvents(
-        organiser,
-        continuation
-      );
-      for (const event of page.events ?? []) {
-        results.push({ organiser, event });
-      }
-      continuation = page.pagination?.has_more_items
-        ? page.pagination.continuation
-        : undefined;
-    } while (continuation);
+    try {
+      let continuation: string | undefined;
+      do {
+        const page = await fetchEventbriteOrganiserEvents(
+          organiser,
+          continuation
+        );
+        for (const event of page.events ?? []) {
+          results.push({ organiser, event });
+        }
+        continuation = page.pagination?.has_more_items
+          ? page.pagination.continuation
+          : undefined;
+      } while (continuation);
+    } catch (err) {
+      errors.push(`organiser ${organiser.name} (${organiser.id}): ${(err as Error).message}`);
+    }
   }
 
-  return results;
+  return { events: results, errors };
 }
 
 function toNumber(value: string | undefined): number | null {

@@ -104,6 +104,23 @@ function parseTateDates(
   return { startAt: single ? single.toISOString() : null, endAt: null };
 }
 
+// Card images are lazy-loaded via <picture><source srcset="...">, with
+// <img src> left pointing at a static placeholder GIF
+// ("/static/images/placeholder/placeholder-4x3....gif") that never changes
+// per event — confirmed live every single card's <img src> was this exact
+// placeholder, meaning every ingested event had the same broken image.
+// The real URL lives in the <source>'s srcset attribute, e.g.
+// "https://media.tate.org.uk/.../Frida_Kahlo_lead.max-500x500.jpg    386w,"
+// — take the first candidate's URL, dropping the trailing width descriptor.
+function extractSrcsetUrl(srcset: string | undefined): string | null {
+  if (!srcset) return null;
+  const first = srcset.split(",")[0]?.trim();
+  if (!first) return null;
+  const url = first.split(/\s+/)[0];
+  if (!url) return null;
+  return url.startsWith("http") ? url : `${BASE_URL}${url}`;
+}
+
 function parseListingPage(html: string): TateRawEvent[] {
   const $ = cheerio.load(html);
   const events: TateRawEvent[] = [];
@@ -141,8 +158,10 @@ function parseListingPage(html: string): TateRawEvent[] {
     }
 
     const imageUrl =
-      $card.find("img").first().attr("src") ??
-      $card.closest("article, li").find("img").first().attr("src") ??
+      extractSrcsetUrl($card.find("picture source").first().attr("srcset")) ??
+      extractSrcsetUrl(
+        $card.closest("article, li").find("picture source").first().attr("srcset")
+      ) ??
       null;
 
     const isFree = /\bfree\b/i.test($card.text());

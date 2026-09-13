@@ -13,6 +13,7 @@ import {
   runPrune,
 } from "@/lib/pipeline";
 import { runNotificationDelivery } from "@/lib/notifications";
+import { mapWithConcurrency } from "@/lib/sources/scrape-utils";
 import { fetchBarbicanEvents, normaliseBarbicanEvent } from "@/lib/sources/barbican";
 import {
   fetchAllEventbriteEvents,
@@ -255,6 +256,20 @@ import {
   fetchNottinghamContemporaryEvents,
   normaliseNottinghamContemporaryEvent,
 } from "@/lib/sources/nottingham-contemporary";
+import { fetchJoshLilleyEvents, normaliseJoshLilleyEvent } from "@/lib/sources/josh-lilley";
+import { fetchHope93Events, normaliseHope93Event } from "@/lib/sources/hope93";
+import { fetchVardaxoglouEvents, normaliseVardaxoglouEvent } from "@/lib/sources/vardaxoglou";
+import { fetchSetarehEvents, normaliseSetarehEvent } from "@/lib/sources/setareh";
+import {
+  fetchNicolettiContemporaryEvents,
+  normaliseNicolettiContemporaryEvent,
+} from "@/lib/sources/nicoletti-contemporary";
+import { fetchCopelandParkEvents, normaliseCopelandParkEvent } from "@/lib/sources/copeland-park";
+import { fetchCubittEvents, normaliseCubittEvent } from "@/lib/sources/cubitt";
+import { fetchYardTheatreEvents, normaliseYardTheatreEvent } from "@/lib/sources/yard-theatre";
+import { fetchSadlersWellsEvents, normaliseSadlersWellsEvent } from "@/lib/sources/sadlers-wells";
+import { fetchLadbrokeHallEvents, normaliseLadbrokeHallEvent } from "@/lib/sources/ladbroke-hall";
+import { fetchBrixtonHouseEvents, normaliseBrixtonHouseEvent } from "@/lib/sources/brixton-house";
 
 // Single entry point for the whole pipeline: fetch every source, then
 // dedup/classify/score the result. This replaces what used to be four
@@ -320,9 +335,9 @@ async function ingestEventbrite(admin: AdminClient): Promise<SourceResult> {
     };
   }
 
-  const raw = await fetchAllEventbriteEvents();
+  const { events: raw, errors: organiserErrors } = await fetchAllEventbriteEvents();
   let upserted = 0;
-  const errors: string[] = [];
+  const errors: string[] = [...organiserErrors];
   for (const { organiser, event } of raw) {
     try {
       await upsertNormalisedEvent(admin, normaliseEventbriteEvent(organiser, event));
@@ -1617,6 +1632,171 @@ async function ingestNottinghamContemporary(admin: AdminClient): Promise<SourceR
   return { fetched: raw.length, upserted, errors };
 }
 
+async function ingestJoshLilley(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchJoshLilleyEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseJoshLilleyEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestHope93(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchHope93Events();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseHope93Event(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestVardaxoglou(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchVardaxoglouEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseVardaxoglouEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestSetareh(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchSetarehEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseSetarehEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestNicolettiContemporary(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchNicolettiContemporaryEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseNicolettiContemporaryEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestCopelandPark(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchCopelandParkEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseCopelandParkEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestCubitt(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchCubittEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseCubittEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestYardTheatre(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchYardTheatreEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseYardTheatreEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestSadlersWells(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchSadlersWellsEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseSadlersWellsEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.id}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestLadbrokeHall(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchLadbrokeHallEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseLadbrokeHallEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+async function ingestBrixtonHouse(admin: AdminClient): Promise<SourceResult> {
+  const raw = await fetchBrixtonHouseEvents();
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const event of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normaliseBrixtonHouseEvent(event));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${event.slug}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
@@ -1627,6 +1807,18 @@ async function runSource(name: string, fn: () => Promise<SourceResult>): Promise
     return { fetched: 0, upserted: 0, errors: [`${name} fetch failed: ${(err as Error).message}`] };
   }
 }
+
+// Running all ~90 sources fully in parallel (plain Promise.all) meant every
+// source's sequential per-event upsertVenue/upsertOrganiser/events.upsert
+// chain was hammering Supabase's connection pool at the same time — a real
+// ingest run on 2026-09-11 came back with "canceling statement due to
+// statement timeout" / "Timed out acquiring connection from connection
+// pool" scattered across nearly every source (most landed at 80-95% of
+// events upserted, not 100%). Capping how many sources run at once bounds
+// how many concurrent per-event upsert chains hit the DB simultaneously.
+// Picked conservatively; raise it if ingest runs feel too slow and the
+// error rate stays low, lower it if timeouts persist.
+const INGEST_SOURCE_CONCURRENCY = 8;
 
 export async function GET(request: NextRequest) {
   if (!isValidBearerSecret(request.headers.get("authorization"), process.env.INGEST_SECRET)) {
@@ -1711,92 +1903,135 @@ export async function GET(request: NextRequest) {
     royalPavilionMuseums,
     deLaWarrPavilion,
     hastingsContemporary,
-  ] = await Promise.all([
-    runSource("barbican", () => ingestBarbican(admin)),
-    runSource("eventbrite", () => ingestEventbrite(admin)),
-    runSource("serpentine", () => ingestSerpentine(admin)),
-    runSource("skiddle", () => ingestSkiddle(admin)),
-    runSource("ticketmaster", () => ingestTicketmaster(admin)),
-    runSource("autograph", () => ingestAutograph(admin)),
-    runSource("queer-britain", () => ingestQueerBritain(admin)),
-    runSource("tate", () => ingestTate(admin)),
-    runSource("horniman", () => ingestHorniman(admin)),
-    runSource("ica", () => ingestIca(admin)),
-    runSource("whitechapel", () => ingestWhitechapel(admin)),
-    runSource("south-london-gallery", () => ingestSouthLondonGallery(admin)),
-    runSource("migration-museum", () => ingestMigrationMuseum(admin)),
-    runSource("vam-east", () => ingestVamEast(admin)),
-    runSource("bio-links", () => ingestBioLinks(admin)),
-    runSource("factory-international", () => ingestFactoryInternational(admin)),
-    runSource("africa-centre", () => ingestAfricaCentre(admin)),
-    runSource("198-gallery", () => ingest198Gallery(admin)),
-    runSource("october-gallery", () => ingestOctoberGallery(admin)),
-    runSource("wellcome", () => ingestWellcome(admin)),
-    runSource("gasworks", () => ingestGasworks(admin)),
-    runSource("museum-of-home", () => ingestMuseumOfHome(admin)),
-    runSource("arnolfini", () => ingestArnolfini(admin)),
-    runSource("dadafest", () => ingestDadafest(admin)),
-    runSource("new-art-exchange", () => ingestNewArtExchange(admin)),
-    runSource("attenborough-arts", () => ingestAttenboroughArts(admin)),
-    runSource("cartwright-hall", () => ingestCartwrightHall(admin)),
-    runSource("shape-arts", () => ingestShapeArts(admin)),
-    runSource("design-museum", () => ingestDesignMuseum(admin)),
-    runSource("national-gallery", () => ingestNationalGallery(admin)),
-    runSource("soane", () => ingestSoane(admin)),
-    runSource("photographers-gallery", () => ingestPhotographersGallery(admin)),
-    runSource("fashion-textile-museum", () => ingestFashionTextileMuseum(admin)),
-    runSource("national-army-museum", () => ingestNationalArmyMuseum(admin)),
-    runSource("home-manchester", () => ingestHomeManchester(admin)),
-    runSource("yorkshire-sculpture-park", () => ingestYorkshireSculpturePark(admin)),
-    runSource("pallant-house", () => ingestPallantHouse(admin)),
-    runSource("hepworth-wakefield", () => ingestHepworthWakefield(admin)),
-    runSource("ibraaz", () => ingestIbraaz(admin)),
-    runSource("national-museum-scotland", () => ingestNationalMuseumScotland(admin)),
-    runSource("birmingham-museum", () => ingestBirminghamMuseum(admin)),
-    runSource("herbert-coventry", () => ingestHerbertCoventry(admin)),
-    runSource("leeds-art-gallery", () => ingestLeedsArtGallery(admin)),
-    runSource("kelvingrove", () => ingestKelvingrove(admin)),
-    runSource("outsavvy", () => ingestOutsavvy(admin)),
-    runSource("new-art-gallery-walsall", () => ingestNewArtGalleryWalsall(admin)),
-    runSource("bluecoat", () => ingestBluecoat(admin)),
-    runSource("golden-thread-gallery", () => ingestGoldenThreadGallery(admin)),
-    runSource("street-level-photoworks", () => ingestStreetLevelPhotoworks(admin)),
-    runSource("fruitmarket-gallery", () => ingestFruitmarketGallery(admin)),
-    runSource("spike-island", () => ingestSpikeIsland(admin)),
-    runSource("goma", () => ingestGoma(admin)),
-    runSource("burrell-collection", () => ingestBurrellCollection(admin)),
-    runSource("riverside-museum", () => ingestRiversideMuseum(admin)),
-    runSource("talbot-rice-gallery", () => ingestTalbotRiceGallery(admin)),
-    runSource("dca", () => ingestDca(admin)),
-    runSource("vam-dundee", () => ingestVamDundee(admin)),
-    runSource("mac-birmingham", () => ingestMacBirmingham(admin)),
-    runSource("firstsite", () => ingestFirstsite(admin)),
-    runSource("sainsbury-centre", () => ingestSainsburyCentre(admin)),
-    runSource("national-museum-cardiff", () => ingestNationalMuseumCardiff(admin)),
-    runSource("fabrica", () => ingestFabrica(admin)),
-    runSource("hunterian", () => ingestHunterian(admin)),
-    runSource("kettles-yard", () => ingestKettlesYard(admin)),
-    runSource("henry-moore-institute", () => ingestHenryMooreInstitute(admin)),
-    runSource("fact-liverpool", () => ingestFactLiverpool(admin)),
-    runSource("laing-art-gallery", () => ingestLaingArtGallery(admin)),
-    runSource("hatton-gallery", () => ingestHattonGallery(admin)),
-    runSource("great-north-museum", () => ingestGreatNorthMuseum(admin)),
-    runSource("discovery-museum-newcastle", () => ingestDiscoveryMuseum(admin)),
-    runSource("bowes-museum", () => ingestBowesMuseum(admin)),
-    runSource("manchester-museum", () => ingestManchesterMuseum(admin)),
-    runSource("royal-pavilion-museums", () => ingestRoyalPavilionMuseums(admin)),
-    runSource("de-la-warr-pavilion", () => ingestDeLaWarrPavilion(admin)),
-    runSource("hastings-contemporary", () => ingestHastingsContemporary(admin)),
-    runSource("vam-south-kensington", () => ingestVamSouthKensington(admin)),
-    runSource("amgueddfa-cymru", () => ingestAmgueddfaCymru(admin)),
-    runSource("aberdeen-art-gallery", () => ingestAberdeenArtGallery(admin)),
-    runSource("leicester-museums", () => ingestLeicesterMuseums(admin)),
-    runSource("victoria-art-gallery", () => ingestVictoriaArtGallery(admin)),
-    runSource("fitzwilliam-museum", () => ingestFitzwilliamMuseum(admin)),
-    runSource("holburne-museum", () => ingestHolburneMuseum(admin)),
-    runSource("wolverhampton-art-gallery", () => ingestWolverhamptonArtGallery(admin)),
-    runSource("nottingham-contemporary", () => ingestNottinghamContemporary(admin)),
-  ]);
+    joshLilley,
+    hope93,
+    vardaxoglou,
+    setareh,
+    nicolettiContemporary,
+    copelandPark,
+    cubitt,
+    yardTheatre,
+    sadlersWells,
+    ladbrokeHall,
+    brixtonHouse,
+    // These 9 had thunks in the array below but no matching destructured
+    // name here — a pre-existing gap (not introduced by this concurrency
+    // refactor) meaning their fetch/upsert results were silently missing
+    // from the API response, even though the sources themselves were
+    // ingesting fine the whole time (upserts are a side effect inside
+    // ingestX(), independent of whether the caller captures the return
+    // value). Found while auditing this block for the mapWithConcurrency
+    // change, fixed alongside it.
+    vamSouthKensington,
+    amgueddfaCymru,
+    aberdeenArtGallery,
+    leicesterMuseums,
+    victoriaArtGallery,
+    fitzwilliamMuseum,
+    holburneMuseum,
+    wolverhamptonArtGallery,
+    nottinghamContemporary,
+  ] = await mapWithConcurrency(
+    [
+    () => runSource("barbican", () => ingestBarbican(admin)),
+    () => runSource("eventbrite", () => ingestEventbrite(admin)),
+    () => runSource("serpentine", () => ingestSerpentine(admin)),
+    () => runSource("skiddle", () => ingestSkiddle(admin)),
+    () => runSource("ticketmaster", () => ingestTicketmaster(admin)),
+    () => runSource("autograph", () => ingestAutograph(admin)),
+    () => runSource("queer-britain", () => ingestQueerBritain(admin)),
+    () => runSource("tate", () => ingestTate(admin)),
+    () => runSource("horniman", () => ingestHorniman(admin)),
+    () => runSource("ica", () => ingestIca(admin)),
+    () => runSource("whitechapel", () => ingestWhitechapel(admin)),
+    () => runSource("south-london-gallery", () => ingestSouthLondonGallery(admin)),
+    () => runSource("migration-museum", () => ingestMigrationMuseum(admin)),
+    () => runSource("vam-east", () => ingestVamEast(admin)),
+    () => runSource("bio-links", () => ingestBioLinks(admin)),
+    () => runSource("factory-international", () => ingestFactoryInternational(admin)),
+    () => runSource("africa-centre", () => ingestAfricaCentre(admin)),
+    () => runSource("198-gallery", () => ingest198Gallery(admin)),
+    () => runSource("october-gallery", () => ingestOctoberGallery(admin)),
+    () => runSource("wellcome", () => ingestWellcome(admin)),
+    () => runSource("gasworks", () => ingestGasworks(admin)),
+    () => runSource("museum-of-home", () => ingestMuseumOfHome(admin)),
+    () => runSource("arnolfini", () => ingestArnolfini(admin)),
+    () => runSource("dadafest", () => ingestDadafest(admin)),
+    () => runSource("new-art-exchange", () => ingestNewArtExchange(admin)),
+    () => runSource("attenborough-arts", () => ingestAttenboroughArts(admin)),
+    () => runSource("cartwright-hall", () => ingestCartwrightHall(admin)),
+    () => runSource("shape-arts", () => ingestShapeArts(admin)),
+    () => runSource("design-museum", () => ingestDesignMuseum(admin)),
+    () => runSource("national-gallery", () => ingestNationalGallery(admin)),
+    () => runSource("soane", () => ingestSoane(admin)),
+    () => runSource("photographers-gallery", () => ingestPhotographersGallery(admin)),
+    () => runSource("fashion-textile-museum", () => ingestFashionTextileMuseum(admin)),
+    () => runSource("national-army-museum", () => ingestNationalArmyMuseum(admin)),
+    () => runSource("home-manchester", () => ingestHomeManchester(admin)),
+    () => runSource("yorkshire-sculpture-park", () => ingestYorkshireSculpturePark(admin)),
+    () => runSource("pallant-house", () => ingestPallantHouse(admin)),
+    () => runSource("hepworth-wakefield", () => ingestHepworthWakefield(admin)),
+    () => runSource("ibraaz", () => ingestIbraaz(admin)),
+    () => runSource("national-museum-scotland", () => ingestNationalMuseumScotland(admin)),
+    () => runSource("birmingham-museum", () => ingestBirminghamMuseum(admin)),
+    () => runSource("herbert-coventry", () => ingestHerbertCoventry(admin)),
+    () => runSource("leeds-art-gallery", () => ingestLeedsArtGallery(admin)),
+    () => runSource("kelvingrove", () => ingestKelvingrove(admin)),
+    () => runSource("outsavvy", () => ingestOutsavvy(admin)),
+    () => runSource("new-art-gallery-walsall", () => ingestNewArtGalleryWalsall(admin)),
+    () => runSource("bluecoat", () => ingestBluecoat(admin)),
+    () => runSource("golden-thread-gallery", () => ingestGoldenThreadGallery(admin)),
+    () => runSource("street-level-photoworks", () => ingestStreetLevelPhotoworks(admin)),
+    () => runSource("fruitmarket-gallery", () => ingestFruitmarketGallery(admin)),
+    () => runSource("spike-island", () => ingestSpikeIsland(admin)),
+    () => runSource("goma", () => ingestGoma(admin)),
+    () => runSource("burrell-collection", () => ingestBurrellCollection(admin)),
+    () => runSource("riverside-museum", () => ingestRiversideMuseum(admin)),
+    () => runSource("talbot-rice-gallery", () => ingestTalbotRiceGallery(admin)),
+    () => runSource("dca", () => ingestDca(admin)),
+    () => runSource("vam-dundee", () => ingestVamDundee(admin)),
+    () => runSource("mac-birmingham", () => ingestMacBirmingham(admin)),
+    () => runSource("firstsite", () => ingestFirstsite(admin)),
+    () => runSource("sainsbury-centre", () => ingestSainsburyCentre(admin)),
+    () => runSource("national-museum-cardiff", () => ingestNationalMuseumCardiff(admin)),
+    () => runSource("fabrica", () => ingestFabrica(admin)),
+    () => runSource("hunterian", () => ingestHunterian(admin)),
+    () => runSource("kettles-yard", () => ingestKettlesYard(admin)),
+    () => runSource("henry-moore-institute", () => ingestHenryMooreInstitute(admin)),
+    () => runSource("fact-liverpool", () => ingestFactLiverpool(admin)),
+    () => runSource("laing-art-gallery", () => ingestLaingArtGallery(admin)),
+    () => runSource("hatton-gallery", () => ingestHattonGallery(admin)),
+    () => runSource("great-north-museum", () => ingestGreatNorthMuseum(admin)),
+    () => runSource("discovery-museum-newcastle", () => ingestDiscoveryMuseum(admin)),
+    () => runSource("bowes-museum", () => ingestBowesMuseum(admin)),
+    () => runSource("manchester-museum", () => ingestManchesterMuseum(admin)),
+    () => runSource("royal-pavilion-museums", () => ingestRoyalPavilionMuseums(admin)),
+    () => runSource("de-la-warr-pavilion", () => ingestDeLaWarrPavilion(admin)),
+    () => runSource("hastings-contemporary", () => ingestHastingsContemporary(admin)),
+    () => runSource("josh-lilley", () => ingestJoshLilley(admin)),
+    () => runSource("hope93", () => ingestHope93(admin)),
+    () => runSource("vardaxoglou", () => ingestVardaxoglou(admin)),
+    () => runSource("setareh", () => ingestSetareh(admin)),
+    () => runSource("nicoletti-contemporary", () => ingestNicolettiContemporary(admin)),
+    () => runSource("copeland-park", () => ingestCopelandPark(admin)),
+    () => runSource("cubitt", () => ingestCubitt(admin)),
+    () => runSource("yard-theatre", () => ingestYardTheatre(admin)),
+    () => runSource("sadlers-wells", () => ingestSadlersWells(admin)),
+    () => runSource("ladbroke-hall", () => ingestLadbrokeHall(admin)),
+    () => runSource("brixton-house", () => ingestBrixtonHouse(admin)),
+    () => runSource("vam-south-kensington", () => ingestVamSouthKensington(admin)),
+    () => runSource("amgueddfa-cymru", () => ingestAmgueddfaCymru(admin)),
+    () => runSource("aberdeen-art-gallery", () => ingestAberdeenArtGallery(admin)),
+    () => runSource("leicester-museums", () => ingestLeicesterMuseums(admin)),
+    () => runSource("victoria-art-gallery", () => ingestVictoriaArtGallery(admin)),
+    () => runSource("fitzwilliam-museum", () => ingestFitzwilliamMuseum(admin)),
+    () => runSource("holburne-museum", () => ingestHolburneMuseum(admin)),
+    () => runSource("wolverhampton-art-gallery", () => ingestWolverhamptonArtGallery(admin)),
+    () => runSource("nottingham-contemporary", () => ingestNottinghamContemporary(admin)),
+    ],
+    INGEST_SOURCE_CONCURRENCY,
+    (run) => run()
+  );
 
   // Sequential and isolated from here: expire first so dedup/classify/
   // quality don't waste work on rows that will never be shown again, then
@@ -1940,6 +2175,26 @@ export async function GET(request: NextRequest) {
       royalPavilionMuseums,
       deLaWarrPavilion,
       hastingsContemporary,
+      joshLilley,
+      hope93,
+      vardaxoglou,
+      setareh,
+      nicolettiContemporary,
+      copelandPark,
+      cubitt,
+      yardTheatre,
+      sadlersWells,
+      ladbrokeHall,
+      brixtonHouse,
+      vamSouthKensington,
+      amgueddfaCymru,
+      aberdeenArtGallery,
+      leicesterMuseums,
+      victoriaArtGallery,
+      fitzwilliamMuseum,
+      holburneMuseum,
+      wolverhamptonArtGallery,
+      nottinghamContemporary,
     },
     expiry,
     dedup,

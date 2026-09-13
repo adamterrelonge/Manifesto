@@ -238,6 +238,10 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "quiet room", confidence: 0.85 },
     { phrase: "sensory room", confidence: 0.9 },
     { phrase: "ear defenders provided", confidence: 0.9 },
+    // Deliberately no bare "relaxed" here — too common a word in ordinary
+    // event copy ("a relaxed evening of jazz") to use as a global keyword;
+    // "relaxed opening" is the specific museum/gallery accessibility term.
+    { phrase: "relaxed opening", confidence: 0.85 },
   ],
   "deaf-accessible": [
     { phrase: "bsl interpreted", confidence: 0.95 },
@@ -248,7 +252,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "live captioning", confidence: 0.9 },
     { phrase: "palantype", confidence: 0.9 },
     { phrase: "speech to text", confidence: 0.85 },
+    { phrase: "speech-to-text", confidence: 0.85 },
     { phrase: "hearing loop", confidence: 0.85 },
+    { phrase: "british sign language", confidence: 0.9 },
   ],
   "womxn-led": [
     { phrase: "womxn", confidence: 0.85 },
