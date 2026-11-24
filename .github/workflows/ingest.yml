@@ -45,7 +45,9 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      # --include=dev: NODE_ENV=production (job env) makes npm skip
+      # devDependencies, but the scripts need tsx and @huggingface/transformers.
+      - run: npm ci --include=dev
 
       # Embedding cache + downloaded model, so each run only embeds new or
       # changed events. Saved under a per-run key; restored from the latest.
