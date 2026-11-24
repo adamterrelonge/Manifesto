@@ -1,9 +1,14 @@
-# Daily ingest + free local semantic tagging.
+# Daily ingest + free local semantic tagging + source health check.
 #
-# Why GitHub Actions and not Vercel Cron: a full run (93 sources + the
-# expiry/dedup/classify/quality/prune/notify pipeline) takes ~4 minutes, and
-# the semantic classifier needs a ~35MB model and CPU inference — neither
-# fits a serverless function. See scripts/ingest.ts.
+# Why GitHub Actions and not Vercel Cron: a full run (90+ sources + the
+# expiry/dedup/classify/quality/prune/notify pipeline, then semantic
+# tagging) takes ~15-20 minutes, and the semantic classifier needs a ~35MB
+# model and CPU inference — neither fits a serverless function. See
+# scripts/ingest.ts.
+#
+# Alerting: the "Source health" step fails the job when a scraper breaks
+# (see lib/source-health.ts), so GitHub's failed-run email is the alert.
+# Its report is on the run's Summary page either way.
 #
 # Required repository secrets (Settings > Secrets and variables > Actions):
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
@@ -29,6 +34,11 @@ jobs:
     timeout-minutes: 45
     env:
       NODE_ENV: production
+      # Scrapers build dates from venue-local wall-clock text ("7:00pm") via
+      # new Date(y, m, d) / setHours, which use the process timezone. The
+      # runner defaults to UTC, which would shift every scraped time by an
+      # hour during BST; match the local dev machine instead.
+      TZ: Europe/London
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SKIDDLE_API_KEY: ${{ secrets.SKIDDLE_API_KEY }}
@@ -49,12 +59,16 @@ jobs:
       # devDependencies, but the scripts need tsx and @huggingface/transformers.
       - run: npm ci --include=dev
 
-      # Embedding cache + downloaded model, so each run only embeds new or
-      # changed events. Saved under a per-run key; restored from the latest.
-      - uses: actions/cache@v4
+      # .cache holds the embedding cache + downloaded model (so each run only
+      # embeds new or changed events) and the source-health history. Restore
+      # and save are separate steps so the save still runs when the health
+      # check fails the job — actions/cache's combined form only saves on
+      # success, which would drop that run from the history.
+      - name: Restore cache
+        uses: actions/cache/restore@v4
         with:
           path: .cache
-          key: classifier-cache-${{ github.run_id }}
+          key: classifier-cache-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: classifier-cache-
 
       - name: Ingest all sources and run the pipeline
@@ -63,11 +77,24 @@ jobs:
       - name: Suggest bucket tags (review queue only, never public)
         run: npm run classify:semantic -- --write
 
+      - name: Source health
+        if: always()
+        run: npm run health
+
+      - name: Save cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: classifier-cache-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Upload run summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ingest-result
-          path: .cache/ingest-latest.json
+          path: |
+            .cache/ingest-latest.json
+            .cache/source-history.json
           if-no-files-found: ignore
           retention-days: 14

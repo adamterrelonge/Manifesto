@@ -101,7 +101,8 @@ export const EVENTBRITE_ORGANISER_MISSIONS: Record<string, SourceMission> = {
   "2849465606": { buckets: ["black"], confidence: 0.9, basis: "name: Black History Walks" },
   "21728722753": { buckets: ["sober-friendly", "womxn-led"], confidence: 0.9, basis: "name: Sober Girl Society" },
   "7299335165": { buckets: ["disability-friendly"], confidence: 0.9, basis: "mission: Shape Arts, disability-led arts organisation" },
-  "18317789304": { buckets: ["deaf-accessible"], confidence: 0.9, basis: "mission: Deaf Rave, Deaf-led music events" },
+  // Deaf Rave (18317789304, ["deaf-accessible"]) removed with its retired
+  // Eventbrite id — restore if it's re-added to eventbrite-organisers.ts.
   "112394878081": { buckets: ["poc"], confidence: 0.85, basis: "curation note: POC-owned-business pop-up market" },
 };
 

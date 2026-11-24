@@ -104,6 +104,13 @@ export function applyTime(date: Date, timeStr: string): Date {
 // own bespoke date parsers in this codebase (e.g. ica.ts's exhibition
 // dates, leicester-museums.ts) — pulled out here since three new adapters
 // need the identical logic rather than each carrying its own copy.
+//
+// Also accepts a single date followed by a start time ("Wednesday 25
+// November - 7:00pm", Ladbroke Hall's card format since Nov 2026) — the
+// dash there separates date from time, not two dates, so the right side
+// would otherwise fail to parse as a date and drop the whole event.
+const CLOCK_TIME = /^\d{1,2}(?:[.:]\d{2})?\s*(?:am|pm)$|^\d{1,2}[.:]\d{2}$/i;
+
 export function parseDayRange(text: string): { startAt: Date | null; endAt: Date | null } {
   const clean = text.replace(/\s+/g, " ").trim();
   const dashMatch = clean.match(/^(.+?)\s*[–-]\s*(.+)$/);
@@ -113,6 +120,10 @@ export function parseDayRange(text: string): { startAt: Date | null; endAt: Date
   }
 
   const [, leftRaw, rightRaw] = dashMatch;
+  if (CLOCK_TIME.test(rightRaw.trim())) {
+    const day = parseDMY(leftRaw);
+    return { startAt: day ? applyTime(day, rightRaw) : null, endAt: null };
+  }
   const end = parseDMY(rightRaw);
   if (!end) return { startAt: null, endAt: null };
 

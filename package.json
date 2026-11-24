@@ -10,7 +10,8 @@
     "test": "vitest run",
     "classify:semantic": "tsx --env-file-if-exists=.env.local scripts/semantic-classify.ts",
     "mine:keywords": "tsx --env-file-if-exists=.env.local scripts/mine-keywords.ts",
-    "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts"
+    "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
+    "health": "tsx scripts/source-health.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

@@ -279,10 +279,16 @@ import { fetchBrixtonHouseEvents, normaliseBrixtonHouseEvent } from "@/lib/sourc
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-interface SourceResult {
+export interface SourceResult {
   fetched: number;
   upserted: number;
   errors: string[];
+  // Deliberately not run (missing optional credential, venue blocks bots) —
+  // reported as such by the health check instead of as a breakage.
+  skipped?: string;
+  // The whole source threw before returning (network failure, listing
+  // 4xx/5xx, site redesign) — as opposed to individual events failing.
+  fatal?: string;
 }
 
 async function ingestBarbican(admin: AdminClient): Promise<SourceResult> {
@@ -843,7 +849,18 @@ async function ingestNationalArmyMuseum(admin: AdminClient): Promise<SourceResul
   return { fetched: raw.length, upserted, errors };
 }
 
+const HOME_MANCHESTER_BLOCKED = true;
+
 async function ingestHomeManchester(admin: AdminClient): Promise<SourceResult> {
+  // Since Nov 2026 homemcr.org answers every non-browser request with a
+  // Bunny Shield bot challenge (403 + challenge cookies; the old apex URL
+  // redirect-loops). robots.txt still allows /whats-on, but an active
+  // challenge is a clear "no bots" signal — same call as NPG/NHM in
+  // docs/PROJECT_PLAN.md: skip rather than work around it. Set the flag
+  // above to false to re-test if they lift it.
+  if (HOME_MANCHESTER_BLOCKED) {
+    return { fetched: 0, upserted: 0, errors: [], skipped: "site serves a bot challenge (Bunny Shield) since Nov 2026" };
+  }
   const raw = await fetchHomeManchesterEvents();
   let upserted = 0;
   const errors: string[] = [];
@@ -994,6 +1011,9 @@ async function ingestKelvingrove(admin: AdminClient): Promise<SourceResult> {
 }
 
 async function ingestOutsavvy(admin: AdminClient): Promise<SourceResult> {
+  if (!process.env.OUTSAVVY_API_TOKEN) {
+    return { fetched: 0, upserted: 0, errors: [], skipped: "OUTSAVVY_API_TOKEN not set" };
+  }
   // Central-UK point + large radius, same "stand-in for the whole UK"
   // approach as Skiddle above — Outsavvy's `range` unit (miles, per the
   // docs) is more clearly specified than Skiddle's undocumented radius.
@@ -1795,7 +1815,16 @@ async function runSource(name: string, fn: () => Promise<SourceResult>): Promise
   try {
     return await fn();
   } catch (err) {
-    return { fetched: 0, upserted: 0, errors: [`${name} fetch failed: ${(err as Error).message}`] };
+    const err_ = err as Error & { cause?: { message?: string } };
+    // undici's "fetch failed" hides the real reason (DNS, TLS, redirect
+    // loop) in .cause — surface it so the health report is actionable.
+    const message = err_.cause?.message ? `${err_.message} (${err_.cause.message})` : err_.message;
+    return {
+      fetched: 0,
+      upserted: 0,
+      errors: [`${name} fetch failed: ${message}`],
+      fatal: message,
+    };
   }
 }
 

@@ -1,17 +1,17 @@
 {
   "sources": {
     "barbican": {
-      "fetched": 235,
-      "upserted": 235,
+      "fetched": 227,
+      "upserted": 227,
       "errors": []
     },
     "eventbrite": {
-      "fetched": 480,
-      "upserted": 480,
+      "fetched": 412,
+      "upserted": 412,
       "errors": [
-        "organiser Deaf Rave (18317789304): Eventbrite API error for organiser 18317789304: 404 NOT FOUND — {\"status_code\":404,\"error\":\"NOT_FOUND\",\"error_description\":\"The organizer you requested does not exist.\"}",
-        "organiser MENA Arts UK (33827581123): Eventbrite API error for organiser 33827581123: 404 NOT FOUND — {\"status_code\":404,\"error_description\":\"The organizer you requested does not exist.\",\"error\":\"NOT_FOUND\"}",
-        "organiser Brain Injury & Neurodivergence Network (33358399311): Eventbrite API error for organiser 33358399311: 404 NOT FOUND — {\"error\":\"NOT_FOUND\",\"status_code\":404,\"error_description\":\"The organizer you requested does not exist.\"}"
+        "organiser Deaf Rave (18317789304): Eventbrite API error for organiser 18317789304: 404 Not Found — {\"error_description\":\"The organizer you requested does not exist.\",\"status_code\":404,\"error\":\"NOT_FOUND\"}",
+        "organiser MENA Arts UK (33827581123): Eventbrite API error for organiser 33827581123: 404 Not Found — {\"error\":\"NOT_FOUND\",\"status_code\":404,\"error_description\":\"The organizer you requested does not exist.\"}",
+        "organiser Brain Injury & Neurodivergence Network (33358399311): Eventbrite API error for organiser 33358399311: 404 Not Found — {\"error\":\"NOT_FOUND\",\"status_code\":404,\"error_description\":\"The organizer you requested does not exist.\"}"
       ]
     },
     "serpentine": {
@@ -30,38 +30,38 @@
       "errors": []
     },
     "autograph": {
-      "fetched": 12,
-      "upserted": 12,
-      "errors": []
-    },
-    "queerBritain": {
-      "fetched": 5,
-      "upserted": 5,
-      "errors": []
-    },
-    "tate": {
-      "fetched": 53,
-      "upserted": 53,
-      "errors": []
-    },
-    "horniman": {
       "fetched": 13,
       "upserted": 13,
       "errors": []
     },
+    "queerBritain": {
+      "fetched": 8,
+      "upserted": 8,
+      "errors": []
+    },
+    "tate": {
+      "fetched": 52,
+      "upserted": 52,
+      "errors": []
+    },
+    "horniman": {
+      "fetched": 14,
+      "upserted": 14,
+      "errors": []
+    },
     "ica": {
-      "fetched": 40,
-      "upserted": 40,
+      "fetched": 43,
+      "upserted": 43,
       "errors": []
     },
     "whitechapel": {
-      "fetched": 6,
-      "upserted": 6,
+      "fetched": 7,
+      "upserted": 7,
       "errors": []
     },
     "southLondonGallery": {
-      "fetched": 6,
-      "upserted": 4,
+      "fetched": 10,
+      "upserted": 8,
       "errors": [
         "event https://www.southlondongallery.org/events/childrens-garden-trail: South London Gallery event https://www.southlondongallery.org/events/childrens-garden-trail has no start date",
         "event https://www.southlondongallery.org/events/family-space-with-sadie-st-hilaire: South London Gallery event https://www.southlondongallery.org/events/family-space-with-sadie-st-hilaire has no start date"
@@ -78,8 +78,8 @@
       "errors": []
     },
     "bioLinks": {
-      "fetched": 32,
-      "upserted": 32,
+      "fetched": 27,
+      "upserted": 27,
       "errors": []
     },
     "factoryInternational": {
@@ -93,8 +93,8 @@
       "errors": []
     },
     "gallery198": {
-      "fetched": 0,
-      "upserted": 0,
+      "fetched": 1,
+      "upserted": 1,
       "errors": []
     },
     "octoberGallery": {
@@ -103,13 +103,13 @@
       "errors": []
     },
     "wellcome": {
-      "fetched": 19,
-      "upserted": 19,
+      "fetched": 17,
+      "upserted": 17,
       "errors": []
     },
     "gasworks": {
-      "fetched": 7,
-      "upserted": 6,
+      "fetched": 6,
+      "upserted": 5,
       "errors": [
         "event events/elders-2046-for-living-and-dying-otherwise: Gasworks event events/elders-2046-for-living-and-dying-otherwise has no start date"
       ]
@@ -120,28 +120,28 @@
       "errors": []
     },
     "arnolfini": {
-      "fetched": 35,
-      "upserted": 35,
+      "fetched": 34,
+      "upserted": 34,
       "errors": []
     },
     "dadafest": {
-      "fetched": 1,
-      "upserted": 1,
+      "fetched": 0,
+      "upserted": 0,
       "errors": []
     },
     "newArtExchange": {
-      "fetched": 25,
-      "upserted": 25,
+      "fetched": 30,
+      "upserted": 30,
       "errors": []
     },
     "attenboroughArts": {
-      "fetched": 108,
-      "upserted": 108,
+      "fetched": 109,
+      "upserted": 109,
       "errors": []
     },
     "cartwrightHall": {
-      "fetched": 6,
-      "upserted": 6,
+      "fetched": 7,
+      "upserted": 7,
       "errors": []
     },
     "shapeArts": {
@@ -155,38 +155,40 @@
       "errors": []
     },
     "nationalGallery": {
-      "fetched": 12,
-      "upserted": 12,
+      "fetched": 11,
+      "upserted": 11,
       "errors": []
     },
     "soane": {
-      "fetched": 18,
-      "upserted": 18,
+      "fetched": 22,
+      "upserted": 22,
       "errors": []
     },
     "photographersGallery": {
-      "fetched": 19,
-      "upserted": 19,
+      "fetched": 16,
+      "upserted": 16,
       "errors": []
     },
     "fashionTextileMuseum": {
-      "fetched": 6,
-      "upserted": 6,
+      "fetched": 4,
+      "upserted": 4,
       "errors": []
     },
     "nationalArmyMuseum": {
-      "fetched": 43,
-      "upserted": 43,
+      "fetched": 40,
+      "upserted": 40,
       "errors": []
     },
     "homeManchester": {
-      "fetched": 123,
-      "upserted": 123,
-      "errors": []
+      "fetched": 0,
+      "upserted": 0,
+      "errors": [
+        "home-manchester fetch failed: fetch failed"
+      ]
     },
     "yorkshireSculpturePark": {
-      "fetched": 8,
-      "upserted": 8,
+      "fetched": 7,
+      "upserted": 7,
       "errors": []
     },
     "pallantHouse": {
@@ -195,18 +197,18 @@
       "errors": []
     },
     "hepworthWakefield": {
-      "fetched": 7,
-      "upserted": 7,
+      "fetched": 6,
+      "upserted": 6,
       "errors": []
     },
     "ibraaz": {
-      "fetched": 9,
-      "upserted": 9,
+      "fetched": 2,
+      "upserted": 2,
       "errors": []
     },
     "nationalMuseumScotland": {
-      "fetched": 5,
-      "upserted": 5,
+      "fetched": 4,
+      "upserted": 4,
       "errors": []
     },
     "birminghamMuseum": {
@@ -215,8 +217,8 @@
       "errors": []
     },
     "herbertCoventry": {
-      "fetched": 17,
-      "upserted": 17,
+      "fetched": 22,
+      "upserted": 22,
       "errors": []
     },
     "leedsArtGallery": {
@@ -237,18 +239,18 @@
       ]
     },
     "newArtGalleryWalsall": {
-      "fetched": 22,
-      "upserted": 22,
+      "fetched": 23,
+      "upserted": 23,
       "errors": []
     },
     "bluecoat": {
-      "fetched": 13,
-      "upserted": 13,
+      "fetched": 14,
+      "upserted": 14,
       "errors": []
     },
     "goldenThreadGallery": {
-      "fetched": 17,
-      "upserted": 17,
+      "fetched": 12,
+      "upserted": 12,
       "errors": []
     },
     "streetLevelPhotoworks": {
@@ -277,33 +279,33 @@
       "errors": []
     },
     "riversideMuseum": {
-      "fetched": 7,
-      "upserted": 7,
+      "fetched": 4,
+      "upserted": 4,
       "errors": []
     },
     "talbotRiceGallery": {
-      "fetched": 7,
-      "upserted": 7,
-      "errors": []
-    },
-    "dca": {
       "fetched": 5,
       "upserted": 5,
       "errors": []
     },
+    "dca": {
+      "fetched": 4,
+      "upserted": 4,
+      "errors": []
+    },
     "vamDundee": {
-      "fetched": 26,
-      "upserted": 26,
+      "fetched": 29,
+      "upserted": 29,
       "errors": []
     },
     "macBirmingham": {
-      "fetched": 9,
-      "upserted": 9,
+      "fetched": 8,
+      "upserted": 8,
       "errors": []
     },
     "firstsite": {
-      "fetched": 78,
-      "upserted": 78,
+      "fetched": 75,
+      "upserted": 75,
       "errors": []
     },
     "sainsburyCentre": {
@@ -322,8 +324,8 @@
       "errors": []
     },
     "hunterian": {
-      "fetched": 14,
-      "upserted": 14,
+      "fetched": 16,
+      "upserted": 16,
       "errors": []
     },
     "kettlesYard": {
@@ -332,13 +334,13 @@
       "errors": []
     },
     "henryMooreInstitute": {
-      "fetched": 6,
-      "upserted": 6,
+      "fetched": 9,
+      "upserted": 9,
       "errors": []
     },
     "factLiverpool": {
-      "fetched": 12,
-      "upserted": 12,
+      "fetched": 13,
+      "upserted": 13,
       "errors": []
     },
     "laingArtGallery": {
@@ -357,8 +359,8 @@
       "errors": []
     },
     "discoveryMuseum": {
-      "fetched": 12,
-      "upserted": 12,
+      "fetched": 13,
+      "upserted": 13,
       "errors": []
     },
     "bowesMuseum": {
@@ -372,18 +374,18 @@
       "errors": []
     },
     "royalPavilionMuseums": {
-      "fetched": 46,
-      "upserted": 46,
+      "fetched": 45,
+      "upserted": 45,
       "errors": []
     },
     "deLaWarrPavilion": {
-      "fetched": 53,
-      "upserted": 53,
+      "fetched": 44,
+      "upserted": 44,
       "errors": []
     },
     "hastingsContemporary": {
-      "fetched": 16,
-      "upserted": 16,
+      "fetched": 12,
+      "upserted": 12,
       "errors": []
     },
     "joshLilley": {
@@ -432,28 +434,28 @@
       "errors": []
     },
     "ladbrokeHall": {
-      "fetched": 2,
-      "upserted": 2,
+      "fetched": 0,
+      "upserted": 0,
       "errors": []
     },
     "brixtonHouse": {
-      "fetched": 20,
-      "upserted": 20,
+      "fetched": 18,
+      "upserted": 18,
       "errors": []
     },
     "vamSouthKensington": {
-      "fetched": 60,
-      "upserted": 60,
+      "fetched": 70,
+      "upserted": 70,
       "errors": []
     },
     "amgueddfaCymru": {
-      "fetched": 53,
-      "upserted": 53,
+      "fetched": 63,
+      "upserted": 63,
       "errors": []
     },
     "aberdeenArtGallery": {
-      "fetched": 15,
-      "upserted": 15,
+      "fetched": 13,
+      "upserted": 13,
       "errors": []
     },
     "leicesterMuseums": {
@@ -462,8 +464,8 @@
       "errors": []
     },
     "victoriaArtGallery": {
-      "fetched": 9,
-      "upserted": 9,
+      "fetched": 10,
+      "upserted": 10,
       "errors": []
     },
     "fitzwilliamMuseum": {
@@ -482,42 +484,42 @@
       "errors": []
     },
     "nottinghamContemporary": {
-      "fetched": 24,
-      "upserted": 24,
+      "fetched": 25,
+      "upserted": 25,
       "errors": []
     }
   },
   "expiry": {
-    "expired": 260
+    "expired": 1733
   },
   "dedup": {
     "venuesMerged": 0,
-    "eventsMatched": 753
+    "eventsMatched": 1049
   },
   "classify": {
-    "eventsProcessed": 3534,
-    "eventsTagged": 55,
-    "bucketAssignments": 66,
+    "eventsProcessed": 3432,
+    "eventsTagged": 366,
+    "bucketAssignments": 529,
     "errors": []
   },
   "categoryInference": {
-    "eventsScanned": 1528,
-    "eventsUpdated": 594,
+    "eventsScanned": 1470,
+    "eventsUpdated": 561,
     "errors": []
   },
   "quality": {
-    "eventsProcessed": 3534,
-    "scored": 3534,
+    "eventsProcessed": 3432,
+    "scored": 3432,
     "errors": []
   },
   "prune": {
-    "duplicatesRemoved": 196,
-    "expiredRemoved": 252,
-    "lowQualityRemoved": 0
+    "duplicatesRemoved": 217,
+    "expiredRemoved": 1393,
+    "lowQualityRemoved": 2
   },
   "notify": {
     "usersWithPreferences": 1,
-    "candidateEvents": 1013,
+    "candidateEvents": 1385,
     "matchesQueued": 0,
     "digestsSent": 0,
     "errors": []

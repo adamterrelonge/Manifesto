@@ -20,15 +20,21 @@ async function main() {
   const secs = ((Date.now() - started) / 1000).toFixed(0);
 
   mkdirSync(".cache", { recursive: true });
-  writeFileSync(".cache/ingest-latest.json", JSON.stringify(result, null, 2));
+  // finishedAt lets scripts/source-health.ts tell this run's result from a
+  // stale one restored from the Actions cache.
+  const finishedAt = new Date().toISOString();
+  writeFileSync(".cache/ingest-latest.json", JSON.stringify({ finishedAt, ...result }, null, 2));
 
   let fetched = 0;
   let upserted = 0;
   const problems: string[] = [];
+  const skipped: string[] = [];
   for (const [name, source] of Object.entries(result.sources)) {
     fetched += source.fetched;
     upserted += source.upserted;
-    if (source.fetched === 0 || source.errors.length > 0) {
+    if (source.skipped) {
+      skipped.push(`${name} (${source.skipped})`);
+    } else if (source.fetched === 0 || source.errors.length > 0) {
       const detail = source.errors[0] ?? "0 events fetched";
       problems.push(`${name}: ${source.fetched} fetched, ${source.errors.length} errors — ${detail.slice(0, 160)}`);
     }
@@ -50,6 +56,7 @@ async function main() {
     console.log(`  ${name}: ${summary.slice(0, 200)}`);
     if (stage && typeof stage === "object" && "error" in stage) failedStages.push(name);
   }
+  if (skipped.length > 0) console.log(`\nskipped: ${skipped.join(", ")}`);
   if (problems.length > 0) {
     console.log(`\n${problems.length} sources with problems:`);
     for (const p of problems) console.log(`  ${p}`);

@@ -40,7 +40,7 @@ function slugFromUrl(url: string): string {
 }
 
 // "1 May – 4 October 2026" (also handles a plain single date with no range).
-function parseExhibitionRange(raw: string): { startAt: string | null; endAt: string | null } {
+export function parseExhibitionRange(raw: string): { startAt: string | null; endAt: string | null } {
   const clean = raw.replace(/\s+/g, " ").trim();
   if (!clean) return { startAt: null, endAt: null };
 
@@ -52,6 +52,11 @@ function parseExhibitionRange(raw: string): { startAt: string | null; endAt: str
   // October 2026") borrows the year from the right part.
   const start = parseDMY(parts[0], year);
   const end = parts.length >= 2 ? parseDMY(parts[1], year) : null;
+  // "1 December – 4 March 2027": the borrowed year belongs to the end, so a
+  // start that lands after the end really began the year before.
+  if (start && end && start > end && !/\d{4}/.test(parts[0])) {
+    start.setFullYear(start.getFullYear() - 1);
+  }
 
   return {
     startAt: start ? start.toISOString() : null,
@@ -121,8 +126,12 @@ export async function fetchDesignMuseumEvents(): Promise<DesignMuseumRawEvent[]>
   if (!res.ok) throw new Error(`Design Museum listing error: ${res.status} ${res.statusText}`);
 
   const cards = parseListingPage(await res.text());
+  // Card hrefs are site-relative ("/exhibitions/..."); a bare path passed to
+  // fetch() throws "Invalid URL", which fetchExhibitionDates swallowed as
+  // "no date" — silently dropping every card (0 events since the adapter
+  // shipped).
   const detailResults = await mapWithConcurrency(cards, DETAIL_FETCH_CONCURRENCY, (c) =>
-    fetchExhibitionDates(c.url)
+    fetchExhibitionDates(new URL(c.url, BASE_URL).toString())
   );
 
   const now = new Date();

@@ -95,17 +95,15 @@ export const EVENTBRITE_ORGANISERS: EventbriteOrganiser[] = [
   { id: "21728722753", name: "Sober Girl Society" },
   { id: "10830367574", name: "Feminist Library" },
   { id: "7299335165", name: "Shape Arts" }, // Major UK disability-led arts org — old id 30514125867 started 404ing (org moved/re-created its Eventbrite profile), updated 2026-09-11
-  // The four below all started 404ing as of 2026-09-11 (see
-  // lib/sources/eventbrite.ts's per-organiser error isolation — a dead id
-  // here now degrades gracefully instead of zeroing out every organiser).
-  // Only MARSM UK had a confidently-identified replacement id; the other
-  // three are left in place (harmless — they just contribute 0 events)
-  // pending a manual check for whether each org still runs Eventbrite
-  // events at all under a new profile.
-  { id: "18317789304", name: "Deaf Rave" },  // Deaf-led music, arts & cultural events — id unverified, no replacement found
-  { id: "33827581123", name: "MENA Arts UK" }, // id unverified, no replacement found
   { id: "6347401953", name: "MARSM UK" }, // Arab & North African music/cultural events — old id 30232298271 404ing, replaced 2026-09-11
-  { id: "33358399311", name: "Brain Injury & Neurodivergence Network" }, // id unverified, no replacement found
+  // Retired 2026-11-24 after 404ing on every run since 2026-09-11 (no
+  // replacement profile found then). Removed so they stop showing up as
+  // errors in the daily source-health report — re-add with a fresh id if
+  // the org turns up on Eventbrite again (and restore Deaf Rave's entry in
+  // lib/source-missions.ts):
+  //   Deaf Rave (was 18317789304) — Deaf-led music, arts & cultural events
+  //   MENA Arts UK (was 33827581123)
+  //   Brain Injury & Neurodivergence Network (was 33358399311)
   { id: "121118620788", name: "Playing Outside" }, // Independent pop-up craft/maker market, Corner Corner, SE16
   { id: "14978114979", name: "Barking Riverside Limited" }, // Runs Emerge East, the annual free Barking Riverside festival
   { id: "112394878081", name: "Esteni Market by Esteni & Co" }, // POC-owned-business pop-up market, Shoreditch EC2A 3AY
