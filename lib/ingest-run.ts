@@ -1,9 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isValidBearerSecret } from "@/lib/auth";
 import { upsertNormalisedEvent } from "@/lib/ingest";
-import { QUALIFYING_EVENTS_CACHE_TAG } from "@/lib/events-query";
 import {
   runExpiry,
   runDedup,
@@ -280,11 +276,6 @@ import { fetchBrixtonHouseEvents, normaliseBrixtonHouseEvent } from "@/lib/sourc
 // individual /api/ingest/*, /api/dedup, /api/classify, /api/quality routes
 // were removed in favour of this one, except dedup/classify/quality which
 // stay reachable standalone too for re-running just one stage.
-export const dynamic = "force-dynamic";
-// Default serverless timeout is too short once Serpentine's 6 listing
-// fetches plus per-event detail fetches are added to the fan-out below;
-// capped harmlessly by the plan's own ceiling if that's lower than 60s.
-export const maxDuration = 60;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -1820,12 +1811,13 @@ async function runSource(name: string, fn: () => Promise<SourceResult>): Promise
 // error rate stays low, lower it if timeouts persist.
 const INGEST_SOURCE_CONCURRENCY = 8;
 
-export async function GET(request: NextRequest) {
-  if (!isValidBearerSecret(request.headers.get("authorization"), process.env.INGEST_SECRET)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export type IngestRunResult = Awaited<ReturnType<typeof runIngest>>;
 
-  const admin = createAdminClient();
+// The whole pipeline: every source, then expiry/dedup/classify/category/
+// quality/prune/notify. Called by app/api/ingest/route.ts (manual trigger)
+// and scripts/ingest.ts (scheduled GitHub Actions run — a full run takes
+// 5+ minutes, far past a serverless function's time limit).
+export async function runIngest(admin: AdminClient = createAdminClient()) {
 
   const [
     barbican,
@@ -2093,12 +2085,8 @@ export async function GET(request: NextRequest) {
     notify = { error: (err as Error).message };
   }
 
-  // Bust the cached fetchQualifyingEvents() result so the home page,
-  // /events, and sitemap show this run's newly published events right
-  // away instead of waiting out its revalidate window.
-  revalidateTag(QUALIFYING_EVENTS_CACHE_TAG, "max");
 
-  return NextResponse.json({
+  return {
     sources: {
       barbican,
       eventbrite,
@@ -2203,5 +2191,5 @@ export async function GET(request: NextRequest) {
     quality,
     prune,
     notify,
-  });
+  };
 }

@@ -1,0 +1,71 @@
+# Daily ingest + free local semantic tagging.
+#
+# Why GitHub Actions and not Vercel Cron: a full run (93 sources + the
+# expiry/dedup/classify/quality/prune/notify pipeline) takes ~4 minutes, and
+# the semantic classifier needs a ~35MB model and CPU inference — neither
+# fits a serverless function. See scripts/ingest.ts.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#   SKIDDLE_API_KEY, TICKETMASTER_API_KEY, EVENTBRITE_API_TOKEN
+# Optional: OUTSAVVY_API_TOKEN (that source is skipped without it),
+#   RESEND_API_KEY / RESEND_FROM_EMAIL (notification digests are only
+#   emailed when set — setting them here turns on real user emails).
+
+name: Ingest
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_ENV: production
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SKIDDLE_API_KEY: ${{ secrets.SKIDDLE_API_KEY }}
+      TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+      EVENTBRITE_API_TOKEN: ${{ secrets.EVENTBRITE_API_TOKEN }}
+      OUTSAVVY_API_TOKEN: ${{ secrets.OUTSAVVY_API_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Embedding cache + downloaded model, so each run only embeds new or
+      # changed events. Saved under a per-run key; restored from the latest.
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: classifier-cache-${{ github.run_id }}
+          restore-keys: classifier-cache-
+
+      - name: Ingest all sources and run the pipeline
+        run: npm run ingest
+
+      - name: Suggest bucket tags (review queue only, never public)
+        run: npm run classify:semantic -- --write
+
+      - name: Upload run summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-result
+          path: .cache/ingest-latest.json
+          if-no-files-found: ignore
+          retention-days: 14
