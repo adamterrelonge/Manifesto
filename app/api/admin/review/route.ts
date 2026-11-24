@@ -40,26 +40,50 @@ export async function GET(request: NextRequest) {
   // them — see 0012_bucket_rejected_state.sql. They're included here (not
   // filtered out) so the admin UI can show them in their own "Rejected" tab
   // instead of just dropping them from view.
-  let query = admin
-    .from("event_buckets")
-    .select(
-      "event_id, bucket_id, confidence, evidence, assigned_by, events(title, start_at), buckets(slug, label)"
-    )
-    .order("confidence", { ascending: true })
-    .limit(1000);
-
+  // Pending and decided rows are fetched separately. A single
+  // `.limit(1000)` over every row used to let the queue silently truncate
+  // once event_buckets outgrew it (5000+ rows, ~3000 of them auto-approved),
+  // so pending suggestions could vanish from "Needs review". Every pending
+  // row is now loaded (paginated); decided rows are capped to the most
+  // recent ones since those tabs are only for undoing recent decisions.
+  const SELECT =
+    "event_id, bucket_id, confidence, evidence, assigned_by, events(title, start_at), buckets(slug, label)";
+  const PAGE_SIZE = 1000;
+  const DECIDED_LIMIT = 1000;
   const excludedIds = (excludedBuckets ?? []).map((b) => b.id as string);
-  if (excludedIds.length > 0) {
-    query = query.not("bucket_id", "in", `(${excludedIds.join(",")})`);
+  const excludedFilter = `(${excludedIds.join(",")})`;
+
+  const pending: unknown[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    let query = admin
+      .from("event_buckets")
+      .select(SELECT)
+      .not("assigned_by", "in", "(moderator,rejected)")
+      .order("confidence", { ascending: true })
+      .order("event_id")
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (excludedIds.length > 0) query = query.not("bucket_id", "in", excludedFilter);
+    const { data, error } = await query;
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    pending.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
   }
 
-  const { data, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let decidedQuery = admin
+    .from("event_buckets")
+    .select(SELECT)
+    .in("assigned_by", ["moderator", "rejected"])
+    .order("created_at", { ascending: false })
+    .limit(DECIDED_LIMIT);
+  if (excludedIds.length > 0) decidedQuery = decidedQuery.not("bucket_id", "in", excludedFilter);
+  const { data: decided, error: decidedError } = await decidedQuery;
+  if (decidedError) {
+    return NextResponse.json({ error: decidedError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ rows: data ?? [] });
+  return NextResponse.json({ rows: [...pending, ...(decided ?? [])] });
 }
 
 export async function POST(request: NextRequest) {

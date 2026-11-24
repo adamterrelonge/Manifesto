@@ -75,6 +75,9 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "afrocaribbean", confidence: 0.85 },
     { phrase: "african and caribbean", confidence: 0.85 },
     { phrase: "african-caribbean", confidence: 0.85 },
+    // Unhyphenated form — found by scripts/mine-keywords.ts (22 tagged
+    // events vs 1 untagged used it; the hyphenated rule missed them all).
+    { phrase: "african caribbean", confidence: 0.85 },
     { phrase: "african diaspora", confidence: 0.85 },
     { phrase: "caribbean diaspora", confidence: 0.85 },
     { phrase: "black heritage", confidence: 0.85 },
@@ -86,10 +89,6 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "bhm", confidence: 0.8 },
     { phrase: "melanin", confidence: 0.75 },
     { phrase: "black owned business", confidence: 0.95 },
-    { phrase: "afro-caribbean", confidence: 0.8 },
-    { phrase: "afrocaribbean", confidence: 0.8 },
-    { phrase: "black history month", confidence: 0.85 },
-    { phrase: "black british", confidence: 0.65 },
     { phrase: "afrobeats", confidence: 0.4 }, // Low: often just a club night genre
     { phrase: "amapiano", confidence: 0.4 },
     { phrase: "black audience", confidence: 0.9 },
@@ -143,6 +142,13 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "trans friendly", confidence: 0.9 },
     { phrase: "trans joy", confidence: 0.9 },
     { phrase: "transgender", confidence: 0.75 },
+    // From scripts/mine-keywords.ts. Bare "trans" is deliberately absent —
+    // \btrans\b also matches "Trans-Pennine"/"trans-Atlantic".
+    { phrase: "bisexual", confidence: 0.85 },
+    { phrase: "bi+", confidence: 0.85 },
+    { phrase: "trans people", confidence: 0.9 },
+    { phrase: "trans and non-binary", confidence: 0.9 },
+    { phrase: "trans & non-binary", confidence: 0.9 },
     { phrase: "non-binary", confidence: 0.75 },
     { phrase: "nonbinary", confidence: 0.75 },
     { phrase: "enby", confidence: 0.7 },
@@ -255,6 +261,12 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "speech-to-text", confidence: 0.85 },
     { phrase: "hearing loop", confidence: 0.85 },
     { phrase: "british sign language", confidence: 0.9 },
+    // Moved here from womxn-led, where they were misfiled — "BSL signed"
+    // was tagging signed performances as womxn-led at 0.9 (gate-passing).
+    { phrase: "bsl signed", confidence: 0.9 },
+    { phrase: "deaf friendly", confidence: 0.85 },
+    { phrase: "deaf-friendly", confidence: 0.85 },
+    { phrase: "subtitled", confidence: 0.7 },
   ],
   "womxn-led": [
     { phrase: "womxn", confidence: 0.85 },
@@ -265,9 +277,6 @@ const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
     { phrase: "flinta", confidence: 0.95 }, // Female, Lesbian, Intersex, Trans, Agender
     { phrase: "women-only", confidence: 0.85 },
     { phrase: "girls night", confidence: 0.4 },
-    { phrase: "bsl signed", confidence: 0.9 },
-    { phrase: "deaf friendly", confidence: 0.85 },
-    { phrase: "subtitled", confidence: 0.7 },
     { phrase: "female-founded", confidence: 0.9 },
     { phrase: "women-founded", confidence: 0.9 },
   ],
@@ -318,8 +327,10 @@ function matchesPhrase(text: string, phrase: string): boolean {
   const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const startsWithWordChar = /\w/.test(phrase[0]);
   const endsWithWordChar = /\w/.test(phrase[phrase.length - 1]);
+  // Optional trailing "s" so plurals match ("drag queens", "queers",
+  // "latinas") — previously only the exact singular form did.
   const pattern = new RegExp(
-    `${startsWithWordChar ? "\\b" : ""}${escaped}${endsWithWordChar ? "\\b" : ""}`,
+    `${startsWithWordChar ? "\\b" : ""}${escaped}${endsWithWordChar ? "s?\\b" : ""}`,
     "i"
   );
   return pattern.test(text);

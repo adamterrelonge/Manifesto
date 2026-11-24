@@ -95,6 +95,28 @@ describe("classifyEventBuckets", () => {
     });
     expect(matches.some((m) => m.bucketSlug === "disability-friendly")).toBe(true);
   });
+
+  // Regression: "bsl signed"/"deaf friendly" were misfiled under womxn-led,
+  // so every BSL-signed performance was tagged womxn-led at 0.9 and passed
+  // the gate on that false identity tag.
+  // Regression: "\bdrag queen\b" didn't match "Drag Queens".
+  it("matches plural forms of phrases", () => {
+    const matches = classifyEventBuckets({
+      title: "DISCO KARAOKE with Drag Queens",
+      description: null,
+      isFree: false,
+    });
+    expect(matches.some((m) => m.bucketSlug === "queer")).toBe(true);
+  });
+
+  it("tags 'BSL signed' as deaf-accessible, not womxn-led", () => {
+    const matches = classifyEventBuckets({
+      title: "Hamlet — BSL signed performance",
+      description: null,
+      isFree: false,
+    });
+    expect(matches.map((m) => m.bucketSlug)).toEqual(["deaf-accessible"]);
+  });
 });
 
 describe("isGateQualifyingBucket", () => {

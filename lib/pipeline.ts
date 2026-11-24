@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyEventBuckets, AUTO_APPROVE_THRESHOLD } from "@/lib/buckets";
 import { venueAccessibilityMatches } from "@/lib/venue-accessibility";
+import { sourceMissionMatches } from "@/lib/source-missions";
 import { inferCategory } from "@/lib/categories";
 import { scoreEventQuality } from "@/lib/quality";
 
@@ -69,14 +70,18 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
     title: string;
     description: string | null;
     is_free: boolean;
+    source_provider: string;
     venues: { name: string } | null;
+    organisers: { name: string; source_type: string; profile_url: string | null } | null;
   }
 
   const events: EventForClassification[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await admin
       .from("events")
-      .select("id, title, description, is_free, venues(name)")
+      .select(
+        "id, title, description, is_free, source_provider, venues(name), organisers(name, source_type, profile_url)"
+      )
       .eq("status", "published")
       .eq("is_duplicate", false)
       .range(offset, offset + PAGE_SIZE - 1)
@@ -117,24 +122,37 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
       isFree: event.is_free,
     });
     const accessMatches = venueAccessibilityMatches(event.venues?.name);
-    if (keywordMatches.length === 0 && accessMatches.length === 0) continue;
+    const missionMatches = sourceMissionMatches({
+      sourceProvider: event.source_provider,
+      organiserSourceType: event.organisers?.source_type,
+      organiserProfileUrl: event.organisers?.profile_url,
+      organiserName: event.organisers?.name,
+    });
+    if (keywordMatches.length === 0 && accessMatches.length === 0 && missionMatches.length === 0) {
+      continue;
+    }
 
-    // Keyword and venue-accessibility can both match the same bucket (e.g.
-    // an event's own copy says "wheelchair accessible" for a venue this
-    // module also knows is step-free) — a single upsert can't touch the
-    // same (event_id, bucket_id) conflict key twice, so keep only the
-    // higher-confidence match per bucket, preferring keyword on a tie
+    // Keyword, venue-accessibility and source-mission can all match the
+    // same bucket (e.g. an event's own copy says "wheelchair accessible" for
+    // a venue this module also knows is step-free) — a single upsert can't
+    // touch the same (event_id, bucket_id) conflict key twice, so keep only
+    // the higher-confidence match per bucket, preferring keyword on a tie
     // since its evidence is specific to this event.
-    const bestByBucket = new Map<string, { match: (typeof keywordMatches)[number]; assignedBy: "keyword" | "venue-accessibility" }>();
+    type AssignedBy = "keyword" | "venue-accessibility" | "source-mission";
+    const bestByBucket = new Map<string, { match: (typeof keywordMatches)[number]; assignedBy: AssignedBy }>();
     for (const match of keywordMatches) {
       bestByBucket.set(match.bucketSlug, { match, assignedBy: "keyword" });
     }
-    for (const match of accessMatches) {
-      const existing = bestByBucket.get(match.bucketSlug);
-      if (!existing || match.confidence > existing.match.confidence) {
-        bestByBucket.set(match.bucketSlug, { match, assignedBy: "venue-accessibility" });
+    const addIfStronger = (matches: typeof keywordMatches, assignedBy: AssignedBy) => {
+      for (const match of matches) {
+        const existing = bestByBucket.get(match.bucketSlug);
+        if (!existing || match.confidence > existing.match.confidence) {
+          bestByBucket.set(match.bucketSlug, { match, assignedBy });
+        }
       }
-    }
+    };
+    addIfStronger(accessMatches, "venue-accessibility");
+    addIfStronger(missionMatches, "source-mission");
 
     const rows = Array.from(bestByBucket.values())
       .map(({ match, assignedBy }) => {

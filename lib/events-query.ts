@@ -86,6 +86,10 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
     event.event_buckets.some(
       (eb) =>
         eb.buckets &&
+        // A moderator-rejected tag keeps its original confidence (it's
+        // retained, not deleted — see 0012_bucket_rejected_state.sql), so
+        // without this a rejected 0.85 match would still pass the gate.
+        eb.assigned_by !== "rejected" &&
         isGateQualifyingBucket(eb.buckets.slug) &&
         (eb.confidence >= HIGH_CONFIDENCE_THRESHOLD || eb.assigned_by === "moderator")
     )
