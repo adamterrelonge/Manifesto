@@ -19,9 +19,11 @@ import {
   appendHistory,
   assessSourceHealth,
   renderHealthMarkdown,
+  renderYieldMarkdown,
   snapshotRun,
   type HistoryEntry,
   type SourceRunResult,
+  type YieldReport,
 } from "@/lib/source-health";
 
 const RESULT_PATH = process.argv[2] ?? ".cache/ingest-latest.json";
@@ -35,7 +37,10 @@ function main() {
   const result = JSON.parse(readFileSync(RESULT_PATH, "utf8")) as {
     finishedAt?: string;
     sources: Record<string, SourceRunResult>;
+    yield?: YieldReport | { error: string };
   };
+  const yieldReport = result.yield && !("error" in result.yield) ? result.yield : undefined;
+  if (result.yield && "error" in result.yield) console.warn(`Yield stage failed: ${result.yield.error}`);
   const at = result.finishedAt ?? new Date().toISOString();
 
   let history: HistoryEntry[] = [];
@@ -57,11 +62,12 @@ function main() {
   }
   const baseline = alreadyRecorded ? history.slice(0, -1) : history;
 
-  const health = assessSourceHealth(result.sources, baseline);
-  const markdown = renderHealthMarkdown(health, baseline.length);
+  const health = assessSourceHealth(result.sources, baseline, yieldReport);
+  const markdown =
+    renderHealthMarkdown(health, baseline.length) + (yieldReport ? "\n" + renderYieldMarkdown(health, yieldReport) : "");
 
   if (!alreadyRecorded) {
-    const updated = appendHistory(history, { at, sources: snapshotRun(result.sources) });
+    const updated = appendHistory(history, { at, sources: snapshotRun(result.sources, yieldReport) });
     mkdirSync(dirname(HISTORY_PATH), { recursive: true });
     writeFileSync(HISTORY_PATH, JSON.stringify(updated));
   }

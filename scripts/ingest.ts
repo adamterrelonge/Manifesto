@@ -49,6 +49,7 @@ async function main() {
     quality: result.quality,
     prune: result.prune,
     notify: result.notify,
+    yield: result.yield,
   };
   const failedStages: string[] = [];
   for (const [name, stage] of Object.entries(stages)) {

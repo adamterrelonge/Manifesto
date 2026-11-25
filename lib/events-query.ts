@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/server";
 import type { EventListItem } from "@/lib/types";
-import { isGateQualifyingBucket, HIGH_CONFIDENCE_THRESHOLD } from "@/lib/buckets";
+import { passesBucketGate, publicWindow } from "@/lib/public-gate";
 import { QUALITY_THRESHOLD } from "@/lib/quality";
 
 export interface QualifyingEventsResult {
@@ -46,22 +46,13 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
   // get entirely consumed by a busy "today" and starve every later day.
   // +8 days gives the client-side week filter (which computes "now" a
   // moment later, in the browser) a little headroom.
-  const now = new Date();
-  const horizon = new Date(now);
-  horizon.setDate(horizon.getDate() + 8);
+  // (8 days — see PUBLIC_WINDOW_DAYS in lib/public-gate.ts.)
+  const { horizonIso, liveFilter } = publicWindow();
 
   // event_buckets!inner is a first-pass gate: it excludes events with zero
-  // bucket matches at all. The JS filter below is the real "niche events
-  // only" gate — an event needs at least one bucket match that is (a) gate-
-  // qualifying per isGateQualifyingBucket (excludes cost buckets like
-  // free-entry, and excludes accessibility-only buckets like
-  // disability-friendly — see lib/buckets.ts's ACCESS_ONLY_BUCKETS comment;
-  // an event tagged only "disability-friendly" + a category like "music"
-  // must not qualify on its own, it needs a real identity/community bucket
-  // too), and (b) either high-confidence or moderator-approved.
-  // A low-confidence keyword guess alone never makes an event public —
-  // it sits in the admin review queue until a moderator approves it or a
-  // stronger match arrives. See docs/PROJECT_PLAN.md §9.
+  // bucket matches at all. passesBucketGate (lib/public-gate.ts) below is
+  // the real "niche events only" gate — shared with the source-health
+  // yield count so the report matches what users see.
   const { data, error } = await supabase
     .from("events")
     .select(
@@ -70,30 +61,14 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
     .eq("status", "published")
     .eq("is_duplicate", false)
     .gte("quality_score", QUALITY_THRESHOLD) // also excludes unscored (null) rows
-    .lt("start_at", horizon.toISOString())
-    // A plain "starts within the window" check only works for one-off
-    // events. Multi-day/month exhibitions (e.g. Barbican's) started long
-    // before "now" but are still running — they need their end_at checked
-    // against "now" instead. Point-in-time events with no end_at fall back
-    // to the original start_at >= now rule so already-finished ones don't
-    // linger forever.
-    .or(`end_at.gte.${now.toISOString()},and(end_at.is.null,start_at.gte.${now.toISOString()})`)
+    .lt("start_at", horizonIso)
+    // Running exhibitions qualify via end_at; see publicWindow.
+    .or(liveFilter)
     .order("start_at", { ascending: true })
     .limit(1000)
     .returns<EventListItem[]>();
 
-  const events = (data ?? []).filter((event) =>
-    event.event_buckets.some(
-      (eb) =>
-        eb.buckets &&
-        // A moderator-rejected tag keeps its original confidence (it's
-        // retained, not deleted — see 0012_bucket_rejected_state.sql), so
-        // without this a rejected 0.85 match would still pass the gate.
-        eb.assigned_by !== "rejected" &&
-        isGateQualifyingBucket(eb.buckets.slug) &&
-        (eb.confidence >= HIGH_CONFIDENCE_THRESHOLD || eb.assigned_by === "moderator")
-    )
-  );
+  const events = (data ?? []).filter((event) => passesBucketGate(event.event_buckets));
 
   return { events, error: error?.message ?? null };
 }

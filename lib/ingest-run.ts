@@ -7,6 +7,7 @@ import {
   runCategoryInference,
   runQualityScoring,
   runPrune,
+  runYield,
 } from "@/lib/pipeline";
 import { runNotificationDelivery } from "@/lib/notifications";
 import { mapWithConcurrency } from "@/lib/sources/scrape-utils";
@@ -127,11 +128,6 @@ import {
   normaliseLeedsArtGalleryEvent,
 } from "@/lib/sources/leeds-art-gallery";
 import { fetchKelvingroveEvents, normaliseKelvingroveEvent } from "@/lib/sources/kelvingrove";
-import {
-  fetchOutsavvyEvents,
-  flattenOutsavvyEvents,
-  normaliseOutsavvyEvent,
-} from "@/lib/sources/outsavvy";
 import {
   fetchNewArtGalleryWalsallEvents,
   normaliseNewArtGalleryWalsallEvent,
@@ -289,6 +285,10 @@ export interface SourceResult {
   // The whole source threw before returning (network failure, listing
   // 4xx/5xx, site redesign) — as opposed to individual events failing.
   fatal?: string;
+  // events.source_provider this source writes — lets the health report join
+  // fetched/upserted with runYield's per-provider shown counts. Set by
+  // runSource, not by each ingestX().
+  provider?: string;
 }
 
 async function ingestBarbican(admin: AdminClient): Promise<SourceResult> {
@@ -1008,54 +1008,6 @@ async function ingestKelvingrove(admin: AdminClient): Promise<SourceResult> {
     }
   }
   return { fetched: raw.length, upserted, errors };
-}
-
-async function ingestOutsavvy(admin: AdminClient): Promise<SourceResult> {
-  if (!process.env.OUTSAVVY_API_TOKEN) {
-    return { fetched: 0, upserted: 0, errors: [], skipped: "OUTSAVVY_API_TOKEN not set" };
-  }
-  // Central-UK point + large radius, same "stand-in for the whole UK"
-  // approach as Skiddle above — Outsavvy's `range` unit (miles, per the
-  // docs) is more clearly specified than Skiddle's undocumented radius.
-  const DEFAULT_LATITUDE = 52.4862; // Birmingham
-  const DEFAULT_LONGITUDE = -1.8904;
-  const DEFAULT_RANGE = 200;
-
-  const today = new Date();
-  const horizon = new Date(today);
-  horizon.setDate(horizon.getDate() + 8);
-  const startDate = today.toISOString().slice(0, 10);
-  const endDate = horizon.toISOString().slice(0, 10);
-
-  const raw: Awaited<ReturnType<typeof fetchOutsavvyEvents>>["events"] = [];
-  const PAGE_SIZE = 50;
-  const MAX_PAGES = 10;
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const batch = await fetchOutsavvyEvents({
-      latitude: DEFAULT_LATITUDE,
-      longitude: DEFAULT_LONGITUDE,
-      range: DEFAULT_RANGE,
-      startDate,
-      endDate,
-      pageNumber: page,
-      pageSize: PAGE_SIZE,
-    });
-    raw.push(...(batch.events ?? []));
-    if ((batch.events?.length ?? 0) < PAGE_SIZE) break;
-  }
-
-  const flattened = flattenOutsavvyEvents(raw);
-  let upserted = 0;
-  const errors: string[] = [];
-  for (const eventDate of flattened) {
-    try {
-      await upsertNormalisedEvent(admin, normaliseOutsavvyEvent(eventDate));
-      upserted += 1;
-    } catch (err) {
-      errors.push(`event ${eventDate.event.id}-${eventDate.date.id}: ${(err as Error).message}`);
-    }
-  }
-  return { fetched: flattened.length, upserted, errors };
 }
 
 async function ingestNewArtGalleryWalsall(admin: AdminClient): Promise<SourceResult> {
@@ -1811,22 +1763,47 @@ async function ingestBrixtonHouse(admin: AdminClient): Promise<SourceResult> {
 // A whole source failing to fetch (bad API key, site redesign, network
 // blip) must not take the other three down with it — each is isolated here
 // rather than letting one thrown error abort the whole Promise.all.
-async function runSource(name: string, fn: () => Promise<SourceResult>): Promise<SourceResult> {
+// `name` is the source key used in logs and normally equals the
+// events.source_provider it writes; pass `provider` when it doesn't.
+async function runSource(
+  name: string,
+  fn: () => Promise<SourceResult>,
+  provider: string = name
+): Promise<SourceResult> {
   try {
-    return await fn();
+    return { ...(await fn()), provider };
   } catch (err) {
     const err_ = err as Error & { cause?: { message?: string } };
     // undici's "fetch failed" hides the real reason (DNS, TLS, redirect
     // loop) in .cause — surface it so the health report is actionable.
     const message = err_.cause?.message ? `${err_.message} (${err_.cause.message})` : err_.message;
+    if (process.env.GITHUB_ACTIONS && CI_IP_BLOCKED_SOURCES.has(name) && /\b(403|405)\b/.test(message)) {
+      return {
+        fetched: 0,
+        upserted: 0,
+        errors: [],
+        skipped: `blocks GitHub Actions runner IPs (${message.slice(0, 80)}) — works from a home connection`,
+        provider,
+      };
+    }
     return {
       fetched: 0,
       upserted: 0,
       errors: [`${name} fetch failed: ${message}`],
       fatal: message,
+      provider,
     };
   }
 }
+
+// Sources whose listing answers 403/405 to GitHub's datacenter runner IPs
+// but 200 to the same request from a residential connection (verified
+// 2026-11-25 — robots.txt allows them; they filter by IP range, not by
+// bot identity). We don't work around an IP block. They're still tried on
+// every run, so they come back on their own if the block lifts; while it
+// holds, a 403/405 in CI is reported as `skipped`, not `broken` (which would
+// fail the job daily). Any other error still counts as broken.
+const CI_IP_BLOCKED_SOURCES = new Set(["serpentine", "fact-liverpool", "ladbroke-hall", "sainsbury-centre"]);
 
 // Running all ~90 sources fully in parallel (plain Promise.all) meant every
 // source's sequential per-event upsertVenue/upsertOrganiser/events.upsert
@@ -1893,7 +1870,6 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     herbertCoventry,
     leedsArtGallery,
     kelvingrove,
-    outsavvy,
     newArtGalleryWalsall,
     bluecoat,
     goldenThreadGallery,
@@ -1968,7 +1944,7 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     () => runSource("south-london-gallery", () => ingestSouthLondonGallery(admin)),
     () => runSource("migration-museum", () => ingestMigrationMuseum(admin)),
     () => runSource("vam-east", () => ingestVamEast(admin)),
-    () => runSource("bio-links", () => ingestBioLinks(admin)),
+    () => runSource("bio-links", () => ingestBioLinks(admin), "bio-link"),
     () => runSource("factory-international", () => ingestFactoryInternational(admin)),
     () => runSource("africa-centre", () => ingestAfricaCentre(admin)),
     () => runSource("198-gallery", () => ingest198Gallery(admin)),
@@ -1998,7 +1974,6 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     () => runSource("herbert-coventry", () => ingestHerbertCoventry(admin)),
     () => runSource("leeds-art-gallery", () => ingestLeedsArtGallery(admin)),
     () => runSource("kelvingrove", () => ingestKelvingrove(admin)),
-    () => runSource("outsavvy", () => ingestOutsavvy(admin)),
     () => runSource("new-art-gallery-walsall", () => ingestNewArtGalleryWalsall(admin)),
     () => runSource("bluecoat", () => ingestBluecoat(admin)),
     () => runSource("golden-thread-gallery", () => ingestGoldenThreadGallery(admin)),
@@ -2115,6 +2090,14 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
   }
 
 
+  // Read-only, after everything that changes what's public.
+  let yieldStage: Awaited<ReturnType<typeof runYield>> | { error: string };
+  try {
+    yieldStage = await runYield(admin);
+  } catch (err) {
+    yieldStage = { error: (err as Error).message };
+  }
+
   return {
     sources: {
       barbican,
@@ -2161,7 +2144,6 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
       herbertCoventry,
       leedsArtGallery,
       kelvingrove,
-      outsavvy,
       newArtGalleryWalsall,
       bluecoat,
       goldenThreadGallery,
@@ -2220,5 +2202,6 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     quality,
     prune,
     notify,
+    yield: yieldStage,
   };
 }

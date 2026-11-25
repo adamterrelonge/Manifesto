@@ -3,7 +3,8 @@ import { classifyEventBuckets, AUTO_APPROVE_THRESHOLD } from "@/lib/buckets";
 import { venueAccessibilityMatches } from "@/lib/venue-accessibility";
 import { sourceMissionMatches } from "@/lib/source-missions";
 import { inferCategory } from "@/lib/categories";
-import { scoreEventQuality } from "@/lib/quality";
+import { scoreEventQuality, QUALITY_THRESHOLD } from "@/lib/quality";
+import { passesBucketGate, publicWindow, type GateBucketRow } from "@/lib/public-gate";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -315,4 +316,53 @@ export async function runPrune(admin: AdminClient): Promise<PruneResult> {
     expiredRemoved: row.expired_removed ?? 0,
     lowQualityRemoved: row.low_quality_removed ?? 0,
   };
+}
+
+export interface ProviderYield {
+  /** Published, non-duplicate, quality-passing events inside the public window. */
+  live: number;
+  /** Of those, how many pass the public bucket gate — what users see. */
+  shown: number;
+}
+
+export interface YieldResult {
+  live: number;
+  shown: number;
+  byProvider: Record<string, ProviderYield>;
+}
+
+// Counts, per source_provider, how many live events actually reach users —
+// the "fetched 800, shown 2" signal the source-health report needs
+// alongside fetched/upserted. Uses the same window and gate helpers as
+// lib/events-query.ts so the numbers match the site. Read-only; run last.
+export async function runYield(admin: AdminClient): Promise<YieldResult> {
+  const { horizonIso, liveFilter } = publicWindow();
+  const byProvider: Record<string, ProviderYield> = {};
+  let live = 0;
+  let shown = 0;
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from("events")
+      .select("id, source_provider, event_buckets(confidence, assigned_by, buckets(slug))")
+      .eq("status", "published")
+      .eq("is_duplicate", false)
+      .gte("quality_score", QUALITY_THRESHOLD)
+      .lt("start_at", horizonIso)
+      .or(liveFilter)
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<{ id: string; source_provider: string; event_buckets: GateBucketRow[] }[]>();
+    if (error) throw new Error(`Yield pass failed: ${error.message}`);
+    for (const row of data ?? []) {
+      const entry = (byProvider[row.source_provider] ??= { live: 0, shown: 0 });
+      entry.live += 1;
+      live += 1;
+      if (passesBucketGate(row.event_buckets)) {
+        entry.shown += 1;
+        shown += 1;
+      }
+    }
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return { live, shown, byProvider };
 }

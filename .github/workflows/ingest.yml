@@ -13,8 +13,7 @@
 # Required repository secrets (Settings > Secrets and variables > Actions):
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 #   SKIDDLE_API_KEY, TICKETMASTER_API_KEY, EVENTBRITE_API_TOKEN
-# Optional: OUTSAVVY_API_TOKEN (that source is skipped without it),
-#   RESEND_API_KEY / RESEND_FROM_EMAIL (notification digests are only
+# Optional: RESEND_API_KEY / RESEND_FROM_EMAIL (notification digests are only
 #   emailed when set — setting them here turns on real user emails).
 
 name: Ingest
@@ -44,7 +43,6 @@ jobs:
       SKIDDLE_API_KEY: ${{ secrets.SKIDDLE_API_KEY }}
       TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
       EVENTBRITE_API_TOKEN: ${{ secrets.EVENTBRITE_API_TOKEN }}
-      OUTSAVVY_API_TOKEN: ${{ secrets.OUTSAVVY_API_TOKEN }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
     steps:
@@ -57,7 +55,9 @@ jobs:
 
       # --include=dev: NODE_ENV=production (job env) makes npm skip
       # devDependencies, but the scripts need tsx and @huggingface/transformers.
-      - run: npm ci --include=dev
+      - name: Install dependencies
+        id: install
+        run: npm ci --include=dev
 
       # .cache holds the embedding cache + downloaded model (so each run only
       # embeds new or changed events) and the source-health history. Restore
@@ -77,8 +77,11 @@ jobs:
       - name: Suggest bucket tags (review queue only, never public)
         run: npm run classify:semantic -- --write
 
+      # Runs even when ingest/classify fail (that's when the report matters),
+      # but not when install failed — then tsx doesn't exist and the step
+      # would only add a misleading "tsx: not found" on top of the real error.
       - name: Source health
-        if: always()
+        if: always() && steps.install.outcome == 'success'
         run: npm run health
 
       - name: Save cache

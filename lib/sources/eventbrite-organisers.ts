@@ -101,8 +101,13 @@ export const EVENTBRITE_ORGANISERS: EventbriteOrganiser[] = [
   // errors in the daily source-health report — re-add with a fresh id if
   // the org turns up on Eventbrite again (and restore Deaf Rave's entry in
   // lib/source-missions.ts):
-  //   Deaf Rave (was 18317789304) — Deaf-led music, arts & cultural events
-  //   MENA Arts UK (was 33827581123)
+  //   Deaf Rave (was 18317789304) — Deaf-led music, arts & cultural events.
+  //     Re-checked 2026-11-25: now tickets via Tickettailor and host venues
+  //     (Rich Mix, Southbank), not Eventbrite — pick up through those
+  //     sources instead (Rich Mix is a candidate in
+  //     docs/INGESTION_EXPANSION_PLAN.md Phase 4).
+  //   MENA Arts UK (was 33827581123) — organisation closed (announced
+  //     April 2024); do not re-add.
   //   Brain Injury & Neurodivergence Network (was 33358399311)
   { id: "121118620788", name: "Playing Outside" }, // Independent pop-up craft/maker market, Corner Corner, SE16
   { id: "14978114979", name: "Barking Riverside Limited" }, // Runs Emerge East, the annual free Barking Riverside festival

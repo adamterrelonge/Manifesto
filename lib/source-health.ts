@@ -28,6 +28,15 @@ export interface SourceRunResult {
   errors: string[];
   skipped?: string;
   fatal?: string;
+  /** events.source_provider the source writes (see runSource). */
+  provider?: string;
+}
+
+/** runYield's output (lib/pipeline.ts), keyed by events.source_provider. */
+export interface YieldReport {
+  live: number;
+  shown: number;
+  byProvider: Record<string, { live: number; shown: number }>;
 }
 
 export interface SourceSnapshot {
@@ -36,6 +45,10 @@ export interface SourceSnapshot {
   errorCount: number;
   skipped?: string;
   fatal?: string;
+  /** Live events in the public window / of those, publicly shown. Absent
+   *  when the run had no yield data (older history entries, failed stage). */
+  live?: number;
+  shown?: number;
 }
 
 export interface HistoryEntry {
@@ -61,15 +74,20 @@ const SHARP_DROP_MIN_MEDIAN = 20;
 const SHARP_DROP_RATIO = 0.25;
 const MEDIAN_WINDOW = 7;
 
-export function snapshotRun(sources: Record<string, SourceRunResult>): Record<string, SourceSnapshot> {
+export function snapshotRun(
+  sources: Record<string, SourceRunResult>,
+  yieldReport?: YieldReport
+): Record<string, SourceSnapshot> {
   const out: Record<string, SourceSnapshot> = {};
   for (const [name, s] of Object.entries(sources)) {
+    const y = yieldReport && s.provider ? (yieldReport.byProvider[s.provider] ?? { live: 0, shown: 0 }) : undefined;
     out[name] = {
       fetched: s.fetched,
       upserted: s.upserted,
       errorCount: s.errors.length,
       ...(s.skipped ? { skipped: s.skipped } : {}),
       ...(s.fatal ? { fatal: s.fatal } : {}),
+      ...(y ? { live: y.live, shown: y.shown } : {}),
     };
   }
   return out;
@@ -83,11 +101,15 @@ function median(values: number[]): number {
 }
 
 // `history` is oldest-first and must not include the current run.
+// Yield never changes a source's status: a source that fetches fine but has
+// nothing public is a gating question, not a breakage. It's reported in its
+// own section by renderHealthMarkdown.
 export function assessSourceHealth(
   sources: Record<string, SourceRunResult>,
-  history: HistoryEntry[]
+  history: HistoryEntry[],
+  yieldReport?: YieldReport
 ): SourceHealth[] {
-  const current = snapshotRun(sources);
+  const current = snapshotRun(sources, yieldReport);
   const results: SourceHealth[] = [];
 
   for (const [name, snap] of Object.entries(current)) {
@@ -168,6 +190,49 @@ const ICON: Record<HealthStatus, string> = {
   skipped: "⏭️",
   ok: "🟢",
 };
+
+/** Sources with at least this many live events but none shown are listed
+ *  as "not reaching users" — below it, 0 shown is just a small programme. */
+export const ZERO_SHOWN_MIN_LIVE = 3;
+const TOP_YIELD_ROWS = 15;
+
+function pct(shown: number, live: number): string {
+  return live === 0 ? "–" : `${Math.round((shown / live) * 100)}%`;
+}
+
+export function renderYieldMarkdown(health: SourceHealth[], yieldReport: YieldReport): string {
+  const withYield = health.filter((h) => h.snapshot.live !== undefined);
+  const lines = [
+    "## Reaching users",
+    "",
+    `**${yieldReport.shown}** of ${yieldReport.live} live events in the public window are shown (${pct(yieldReport.shown, yieldReport.live)}).`,
+    "",
+  ];
+
+  const byLive = [...withYield]
+    .filter((h) => (h.snapshot.live ?? 0) > 0)
+    .sort((a, b) => (b.snapshot.live ?? 0) - (a.snapshot.live ?? 0) || a.name.localeCompare(b.name));
+  if (byLive.length > 0) {
+    lines.push("| Source | Fetched | Live | Shown | % |", "|---|---|---|---|---|");
+    for (const h of byLive.slice(0, TOP_YIELD_ROWS)) {
+      const { fetched, live = 0, shown = 0 } = h.snapshot;
+      lines.push(`| ${h.name} | ${fetched} | ${live} | ${shown} | ${pct(shown, live)} |`);
+    }
+    lines.push("");
+  }
+
+  const notReaching = withYield
+    .filter((h) => (h.snapshot.live ?? 0) >= ZERO_SHOWN_MIN_LIVE && h.snapshot.shown === 0)
+    .map((h) => `${h.name} (${h.snapshot.live})`);
+  if (notReaching.length > 0) {
+    lines.push(
+      `**Live events but none shown** (${notReaching.length}): ${notReaching.join(", ")}`,
+      ""
+    );
+  }
+
+  return lines.join("\n") + "\n";
+}
 
 export function renderHealthMarkdown(health: SourceHealth[], historyRuns: number): string {
   const count = (s: HealthStatus) => health.filter((h) => h.status === s).length;

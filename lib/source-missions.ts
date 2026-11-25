@@ -125,7 +125,6 @@ export const PROVIDER_MISSIONS: Record<string, SourceMission> = {
   autograph: { buckets: ["black"], confidence: 0.85, basis: "mission: Autograph, founded as the Association of Black Photographers" },
   "198-gallery": { buckets: ["poc"], confidence: 0.85, basis: "mission: 198 Contemporary Arts and Learning, artists of colour" },
   "new-art-exchange": { buckets: ["poc"], confidence: 0.85, basis: "mission: New Art Exchange, global majority contemporary arts" },
-  outsavvy: { buckets: ["queer"], confidence: 0.85, basis: "mission: OutSavvy, LGBTQ+ events platform" },
   dadafest: { buckets: ["disability-friendly"], confidence: 0.9, basis: "mission: DaDaFest, disability and Deaf arts" },
   "shape-arts": { buckets: ["disability-friendly"], confidence: 0.9, basis: "mission: Shape Arts, disability-led arts organisation" },
 };

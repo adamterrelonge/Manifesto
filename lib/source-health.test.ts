@@ -5,6 +5,7 @@ import {
   HISTORY_LIMIT,
   LONG_EMPTY_RUNS,
   renderHealthMarkdown,
+  renderYieldMarkdown,
   snapshotRun,
   type HistoryEntry,
   type SourceRunResult,
@@ -96,5 +97,46 @@ describe("renderHealthMarkdown", () => {
     expect(md).toContain("| bad |");
     expect(md).not.toContain("| good |");
     expect(md).toContain("a \\| b");
+  });
+});
+
+describe("yield", () => {
+  const yieldReport = {
+    live: 60,
+    shown: 6,
+    byProvider: {
+      ticketmaster: { live: 50, shown: 1 },
+      "bio-link": { live: 5, shown: 5 },
+      skiddle: { live: 5, shown: 0 },
+    },
+  };
+  const sources = {
+    ticketmaster: run(800, { provider: "ticketmaster" }),
+    bioLinks: run(17, { provider: "bio-link" }),
+    skiddle: run(600, { provider: "skiddle" }),
+    tate: run(26, { provider: "tate" }),
+    legacy: run(3),
+  };
+
+  it("joins live/shown onto snapshots by provider, 0 when the provider has no live events", () => {
+    const snap = snapshotRun(sources, yieldReport);
+    expect(snap.bioLinks).toMatchObject({ live: 5, shown: 5 });
+    expect(snap.tate).toMatchObject({ live: 0, shown: 0 });
+    expect(snap.legacy.live).toBeUndefined();
+    expect(snapshotRun(sources).ticketmaster.live).toBeUndefined();
+  });
+
+  it("never changes a source's health status", () => {
+    const withYield = assessSourceHealth(sources, [], yieldReport).map((h) => [h.name, h.status]);
+    const without = assessSourceHealth(sources, []).map((h) => [h.name, h.status]);
+    expect(withYield).toEqual(without);
+  });
+
+  it("reports totals, the funnel table, and sources with live events but none shown", () => {
+    const md = renderYieldMarkdown(assessSourceHealth(sources, [], yieldReport), yieldReport);
+    expect(md).toContain("**6** of 60 live events");
+    expect(md).toContain("| ticketmaster | 800 | 50 | 1 | 2% |");
+    expect(md).toContain("Live events but none shown** (1): skiddle (5)");
+    expect(md).not.toContain("| tate |");
   });
 });
