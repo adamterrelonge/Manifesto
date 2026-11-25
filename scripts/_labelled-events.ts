@@ -13,19 +13,26 @@ interface Row {
   description: string | null;
   is_free: boolean;
   source_provider: string;
+  scale: string | null;
+  category: string | null;
   organisers: { name: string; source_type: string; profile_url: string | null } | null;
   event_buckets: { confidence: number | null; assigned_by: string; buckets: { slug: string } | null }[];
 }
 
 export type Admin = ReturnType<typeof createAdminClient>;
 
-export async function loadLabelledEvents(admin: Admin): Promise<LabelSourceEvent[]> {
+export interface LoadedEvent extends LabelSourceEvent {
+  scale: string | null;
+  category: string | null;
+}
+
+export async function loadLabelledEvents(admin: Admin): Promise<LoadedEvent[]> {
   const rows: Row[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await admin
       .from("events")
       .select(
-        "id, title, description, is_free, source_provider, organisers(name, source_type, profile_url), event_buckets(confidence, assigned_by, buckets(slug))"
+        "id, title, description, is_free, source_provider, scale, category, organisers(name, source_type, profile_url), event_buckets(confidence, assigned_by, buckets(slug))"
       )
       .eq("status", "published")
       .eq("is_duplicate", false)
@@ -42,6 +49,8 @@ export async function loadLabelledEvents(admin: Admin): Promise<LabelSourceEvent
     title: r.title,
     description: r.description,
     isFree: r.is_free,
+    scale: r.scale,
+    category: r.category,
     sourceProvider: r.source_provider,
     organiserSourceType: r.organisers?.source_type ?? null,
     organiserProfileUrl: r.organisers?.profile_url ?? null,

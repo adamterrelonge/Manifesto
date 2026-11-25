@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "classify:semantic": "tsx --env-file-if-exists=.env.local scripts/semantic-classify.ts",
+    "classify:model": "tsx --env-file-if-exists=.env.local scripts/model-classify.ts",
     "mine:keywords": "tsx --env-file-if-exists=.env.local scripts/mine-keywords.ts",
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "health": "tsx scripts/source-health.ts"

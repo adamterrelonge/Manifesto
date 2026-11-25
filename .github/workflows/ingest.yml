@@ -77,6 +77,14 @@ jobs:
       - name: Suggest bucket tags (review queue only, never public)
         run: npm run classify:semantic -- --write
 
+      # Local zero-shot model (lib/zero-shot.ts): writes tags only for
+      # buckets that passed the precision bar in docs/MODEL_EVAL.md, each
+      # with a verbatim evidence passage. After the step above so it can
+      # upgrade a pending embedding suggestion it finds evidence for.
+      # Needs migration 0021. Shown counts include these from the next run.
+      - name: Model tags with evidence (eval-gated buckets only)
+        run: npm run classify:model -- --write
+
       # Runs even when ingest/classify fail (that's when the report matters),
       # but not when install failed — then tsx doesn't exist and the step
       # would only add a misleading "tsx: not found" on top of the real error.

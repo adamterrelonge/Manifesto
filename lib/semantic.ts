@@ -95,8 +95,9 @@ export interface BucketLabels {
   tagged: Set<string>;
 }
 
-/** Tags that describe the organiser/venue rather than the event's own text. */
-const NON_TEXT_ASSIGNERS = new Set(["source-mission", "venue-accessibility", "embedding"]);
+/** Tags not used as kNN positives: organiser/venue-level tags, and other
+ *  models' output (learning from it would let model errors reinforce). */
+const NON_TEXT_ASSIGNERS = new Set(["source-mission", "venue-accessibility", "embedding", "model-evidence"]);
 
 /** Labels per gate-qualifying bucket, combining what's stored in
  *  event_buckets with what the current keyword + mission rules would assign

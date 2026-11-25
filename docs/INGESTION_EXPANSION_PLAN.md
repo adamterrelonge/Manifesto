@@ -241,6 +241,24 @@ benchmark on the CI runner).
 **Done when:** eval report committed; auto-apply on for formats/scale/
 `community-culture`; identity auto-apply on only for buckets that pass.
 
+### Status (2026-11-25) — built; 2 of 10 buckets passed the bar
+
+- `lib/zero-shot.ts` + `scripts/model-classify.ts` (`npm run classify:model`),
+  new CI step after the embedding suggester. Writes `assigned_by:
+  'model-evidence'` (migration **0021, apply before the next run**) at
+  confidence 0.8–0.9 — public, still in `/admin/review`, verbatim evidence
+  passage, organiser name masked, never on large events, never over a
+  keyword/mission/moderator/rejected row.
+- Eval in `docs/MODEL_EVAL.md`, labels in `docs/eval/model-labels.json`:
+  **queer (0.9) and poc (0.99) on**; every other bucket, community-culture
+  and category backfill **off** — 0–86% precision, below the 95% bar.
+  Scale was not given to the model (text doesn't carry capacity).
+- Deviation from 3a: format/`community-culture` were planned as low-risk
+  auto-apply, but community-culture is gate-qualifying (it makes events
+  public), so it was held to the same 95% bar — and failed (38–53%).
+- Effect on live data: 11 tags (9 poc, 2 queer). The shown count still
+  depends on Phase 4.
+
 ## Phase 4 — New sources
 
 Each candidate: check `robots.txt` (named AI-bot blocks = skip, as with
