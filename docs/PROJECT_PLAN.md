@@ -6,6 +6,8 @@ A single map/list/card interface that aggregates the UK's events, openings and s
 
 **The app only ever shows events that matched at least one bucket.** Aggregation pulls in everything from a source (generic gigs, mainstream theatre, etc.), but bucket-tagging isn't a filter layered on top of a general listings feed — it's the gate. An event with zero community/accessibility signal in its own copy is discarded from what users see, not just deprioritised. This is what keeps the product "niche events for these communities," not "everything, with some of it labelled."
 
+> **Updated 2026-11-25 (docs/INGESTION_EXPANSION_PLAN.md):** the gate is now *community-scale AND (an identity bucket OR `community-culture`)*. `community-culture` ("Culture & Lates") covers small-scale culture whoever it is for — museum Lates, artist talks, community screenings, zine fairs — and curated community-anchored sources (`lib/community-culture.ts`). Large-scale events (venues of 300+, arena tours, commercial attractions — `lib/scale.ts`) are never shown, whatever their buckets. Access tags (step-free, BSL, relaxed) remain a bonus label, never a reason to show an event. The gate lives in `lib/public-gate.ts`.
+
 ## 2. Why this exists
 
 Mainstream discovery apps (Eventbrite, Time Out, Google) are dominated by whoever pays for placement or has the ops capacity to list on every platform. The events that matter most to underrepresented communities are frequently:
@@ -159,6 +161,8 @@ Dedup strategy: fuzzy-match on (title similarity + venue + date window) across s
 **Goal**: not just "is this a gig" but *who is this for, and is it accessible to them*.
 
 **Bucket-tagging is a gate, not a filter.** Events with zero matched buckets are discarded from every user-facing view (list/card/map) — the app deliberately does not show "everything, with some of it labelled." The raw aggregated feed (everything from every source) only exists internally, as input to this classification step.
+
+> See the 2026-11-25 update under §1: the gate also requires community scale, and the `community-culture` bucket qualifies alongside identity buckets.
 
 - **v1 implementation is a free, from-scratch keyword/phrase classifier** (`lib/buckets.ts`), not an LLM — deterministic, zero ongoing cost, and re-runnable anytime. It only matches explicit phrases actually present in an event's own title/description (never infers from an organiser's name), which happens to satisfy the bias safeguard below by construction. A real LLM-based pass (see below) remains a valid future upgrade for nuance the keyword approach can't catch — if added, it should be clearly distinguished from keyword matches (e.g. a distinct `assigned_by` value) so users and moderators can tell which method produced a given tag.
 - Longer-term/LLM version: run as a **batch enrichment step** after normalisation, not live per page-load — cheaper, cacheable, and lets you review/correct output before it's public.

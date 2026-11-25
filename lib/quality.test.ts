@@ -79,4 +79,12 @@ describe("scoreEventQuality", () => {
     });
     expect(result.score).toBe(0);
   });
+
+  it("drops voucher/membership pages below the threshold", () => {
+    for (const title of ["Gift Voucher", "Membership", "Donate"]) {
+      const r = scoreEventQuality({ title, description: "A long enough description here.", venueId: "v", imageUrl: "i" });
+      expect(r.score, title).toBeLessThan(0.5);
+    }
+    expect(scoreEventQuality({ title: "Gift Wrapping Workshop", description: "A long enough description here.", venueId: "v", imageUrl: "i" }).score).toBe(1);
+  });
 });

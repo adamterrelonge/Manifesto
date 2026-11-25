@@ -23,7 +23,11 @@ export type BucketSlug =
   | "sober-friendly"
   | "grassroots-activism"
   | "low-income-access"
-  | "free-entry";
+  | "free-entry"
+  // Not an identity: small-scale culture (Lates, artist talks, community
+  // screenings) and curated community-anchored sources — see
+  // lib/community-culture.ts. Matched there, not in BUCKET_KEYWORDS.
+  | "community-culture";
 
 export const HIGH_CONFIDENCE_THRESHOLD = 0.8;
 
@@ -43,7 +47,7 @@ interface KeywordRule {
   confidence: number;
 }
 
-type KeywordBucketSlug = Exclude<BucketSlug, "free-entry">;
+type KeywordBucketSlug = Exclude<BucketSlug, "free-entry" | "community-culture">;
 
 const BUCKET_KEYWORDS: Record<KeywordBucketSlug, KeywordRule[]> = {
   black: [
@@ -384,6 +388,7 @@ export const BUCKET_LABELS: Record<BucketSlug, string> = {
   "grassroots-activism": "Grassroots & Activism",
   "low-income-access": "Low-income Access",
   "free-entry": "Free Entry",
+  "community-culture": "Culture & Lates",
 };
 
 // These describe access/cost, not identity or a specific accessibility

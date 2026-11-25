@@ -35,6 +35,14 @@ export function passesBucketGate(eventBuckets: GateBucketRow[]): boolean {
   );
 }
 
+/** The whole gate: community-scale (anything but 'large' — 'unknown' and
+ *  unscored rows count as community, see lib/scale.ts) AND a qualifying
+ *  bucket. Identity buckets don't let a large event through either: the
+ *  scale rule applies to every event. */
+export function passesPublicGate(event: { scale?: string | null; event_buckets: GateBucketRow[] }): boolean {
+  return event.scale !== "large" && passesBucketGate(event.event_buckets);
+}
+
 /** Date bounds of the public feed. Multi-day exhibitions that started
  *  before `now` but are still running qualify via end_at; point-in-time
  *  events with no end_at must start from `now` so finished ones don't

@@ -21,6 +21,7 @@ export const QUALITY_THRESHOLD = 0.5;
 const MIN_TITLE_LENGTH = 4;
 const REPEATED_CHAR_PATTERN = /(.)\1{4,}/; // e.g. "!!!!!" or "aaaaa"
 const EXCESSIVE_PUNCTUATION_PATTERN = /[!?]{3,}/;
+const NOT_AN_EVENT_PATTERN = /^(?:gift (?:voucher|card|certificate)s?|e-?gift cards?|memberships?|become a (?:member|friend)|donate|make a donation|support us)\b/i;
 
 export function scoreEventQuality(event: QualityCheckEvent): QualityResult {
   let score = 1;
@@ -35,6 +36,14 @@ export function scoreEventQuality(event: QualityCheckEvent): QualityResult {
   if (REPEATED_CHAR_PATTERN.test(title)) {
     score -= 0.4;
     flags.push("repeated characters in title");
+  }
+
+  // Shop/admin pages some venue listings mix in with real events (seen
+  // live: Attenborough Arts "Gift Voucher"). Enough on its own to drop
+  // below QUALITY_THRESHOLD.
+  if (NOT_AN_EVENT_PATTERN.test(title)) {
+    score -= 0.6;
+    flags.push("not an event (voucher/membership/donation page)");
   }
 
   if (EXCESSIVE_PUNCTUATION_PATTERN.test(title)) {

@@ -172,6 +172,27 @@ allow-listed wholesale — their individual events qualify via 2d.
 publicly; arena/tour events do not; shown count is measured against the
 baseline.
 
+**Status (2026-11-25):** built; needs migration `0020_community_scale.sql`
+applied before deploy.
+- 2a ✅ `lib/scale.ts` + `runScale` stage (after dedup, before classify);
+  `venues.capacity`, `events.scale`/`scale_reasons`. Venue list built from
+  the venues actually in live Ticketmaster/Skiddle data.
+- 2b ✅ Ticketmaster switched off (`TICKETMASTER_ENABLED` in
+  `lib/ingest-run.ts`): 811 events in 274 venues, all 300+, 0 shown.
+  Skiddle kept — mixed small/large, the scale filter sorts it. Neither API
+  exposes capacity, so no query-level capacity filter is possible.
+- 2c ✅ `COMMUNITY_ANCHORED_PROVIDERS` (23 sources) and
+  `COMMUNITY_ANCHORED_EVENTBRITE` (24 organisers) in
+  `lib/community-culture.ts`, each with a recorded basis.
+- 2d ✅ `community-culture` bucket — Lates (title, 0.9) and small-scale
+  formats (0.85), plus the anchored sources (0.85). Never on large events.
+- 2e ✅ Shows under Community as "Culture & Lates"; gate in
+  `lib/public-gate.ts`; PROJECT_PLAN.md §1/§9 updated.
+- Also: quality scoring now drops voucher/membership/donation pages.
+- **Projection on live data (read-only, before migration): 71 → 134
+  shown** in the week window; 0 currently-shown events lost to the scale
+  filter; 512 marked large. The ≥ 300 target needs Phase 4's sources.
+
 ## Phase 3 — Local model does more
 
 Builds on the existing CPU pipeline (`scripts/semantic-classify.ts`,

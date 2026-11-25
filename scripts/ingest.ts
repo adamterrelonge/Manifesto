@@ -44,6 +44,7 @@ async function main() {
   const stages = {
     expiry: result.expiry,
     dedup: result.dedup,
+    scale: result.scale,
     classify: result.classify,
     categoryInference: result.categoryInference,
     quality: result.quality,

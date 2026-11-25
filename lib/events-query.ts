@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/server";
 import type { EventListItem } from "@/lib/types";
-import { passesBucketGate, publicWindow } from "@/lib/public-gate";
+import { passesPublicGate, publicWindow } from "@/lib/public-gate";
 import { QUALITY_THRESHOLD } from "@/lib/quality";
 
 export interface QualifyingEventsResult {
@@ -50,13 +50,13 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
   const { horizonIso, liveFilter } = publicWindow();
 
   // event_buckets!inner is a first-pass gate: it excludes events with zero
-  // bucket matches at all. passesBucketGate (lib/public-gate.ts) below is
-  // the real "niche events only" gate — shared with the source-health
+  // bucket matches at all. passesPublicGate (lib/public-gate.ts) below is
+  // the real gate (community-scale + qualifying bucket) — shared with the source-health
   // yield count so the report matches what users see.
   const { data, error } = await supabase
     .from("events")
     .select(
-      "id, title, description, start_at, end_at, category, is_free, price_min, currency, source_url, image_url, venues(id, name, city, region, lat, lng), event_buckets!inner(confidence, assigned_by, bucket_id, buckets(slug, label))"
+      "id, title, description, start_at, end_at, category, scale, is_free, price_min, currency, source_url, image_url, venues(id, name, city, region, lat, lng), event_buckets!inner(confidence, assigned_by, bucket_id, buckets(slug, label))"
     )
     .eq("status", "published")
     .eq("is_duplicate", false)
@@ -68,7 +68,7 @@ async function fetchQualifyingEventsUncached(): Promise<QualifyingEventsResult> 
     .limit(1000)
     .returns<EventListItem[]>();
 
-  const events = (data ?? []).filter((event) => passesBucketGate(event.event_buckets));
+  const events = (data ?? []).filter((event) => passesPublicGate(event));
 
   return { events, error: error?.message ?? null };
 }

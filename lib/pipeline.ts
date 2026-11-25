@@ -4,7 +4,9 @@ import { venueAccessibilityMatches } from "@/lib/venue-accessibility";
 import { sourceMissionMatches } from "@/lib/source-missions";
 import { inferCategory } from "@/lib/categories";
 import { scoreEventQuality, QUALITY_THRESHOLD } from "@/lib/quality";
-import { passesBucketGate, publicWindow, type GateBucketRow } from "@/lib/public-gate";
+import { passesPublicGate, publicWindow, type GateBucketRow } from "@/lib/public-gate";
+import { assessScale } from "@/lib/scale";
+import { communityCultureFormatMatch, communityCultureSourceMatch } from "@/lib/community-culture";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -72,6 +74,7 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
     description: string | null;
     is_free: boolean;
     source_provider: string;
+    scale: string | null;
     venues: { name: string } | null;
     organisers: { name: string; source_type: string; profile_url: string | null } | null;
   }
@@ -81,7 +84,7 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
     const { data, error } = await admin
       .from("events")
       .select(
-        "id, title, description, is_free, source_provider, venues(name), organisers(name, source_type, profile_url)"
+        "id, title, description, is_free, source_provider, scale, venues(name), organisers(name, source_type, profile_url)"
       )
       .eq("status", "published")
       .eq("is_duplicate", false)
@@ -123,12 +126,22 @@ export async function runClassification(admin: AdminClient): Promise<Classificat
       isFree: event.is_free,
     });
     const accessMatches = venueAccessibilityMatches(event.venues?.name);
-    const missionMatches = sourceMissionMatches({
+    const lookup = {
       sourceProvider: event.source_provider,
       organiserSourceType: event.organisers?.source_type,
       organiserProfileUrl: event.organisers?.profile_url,
       organiserName: event.organisers?.name,
-    });
+    };
+    const missionMatches = sourceMissionMatches(lookup);
+    // community-culture (lib/community-culture.ts) is never given to a
+    // large-scale event — runScale runs first, so scale is current. The
+    // format match comes from the event's own copy (keyword); the source
+    // match is organiser-level, like a mission.
+    const isLarge = event.scale === "large";
+    const cultureFormat = isLarge ? null : communityCultureFormatMatch(event.title, event.description);
+    const cultureSource = isLarge ? null : communityCultureSourceMatch(lookup);
+    if (cultureFormat) keywordMatches.push(cultureFormat);
+    if (cultureSource) missionMatches.push(cultureSource);
     if (keywordMatches.length === 0 && accessMatches.length === 0 && missionMatches.length === 0) {
       continue;
     }
@@ -343,7 +356,7 @@ export async function runYield(admin: AdminClient): Promise<YieldResult> {
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await admin
       .from("events")
-      .select("id, source_provider, event_buckets(confidence, assigned_by, buckets(slug))")
+      .select("id, source_provider, scale, event_buckets(confidence, assigned_by, buckets(slug))")
       .eq("status", "published")
       .eq("is_duplicate", false)
       .gte("quality_score", QUALITY_THRESHOLD)
@@ -351,13 +364,13 @@ export async function runYield(admin: AdminClient): Promise<YieldResult> {
       .or(liveFilter)
       .order("id")
       .range(offset, offset + PAGE_SIZE - 1)
-      .returns<{ id: string; source_provider: string; event_buckets: GateBucketRow[] }[]>();
+      .returns<{ id: string; source_provider: string; scale: string | null; event_buckets: GateBucketRow[] }[]>();
     if (error) throw new Error(`Yield pass failed: ${error.message}`);
     for (const row of data ?? []) {
       const entry = (byProvider[row.source_provider] ??= { live: 0, shown: 0 });
       entry.live += 1;
       live += 1;
-      if (passesBucketGate(row.event_buckets)) {
+      if (passesPublicGate(row)) {
         entry.shown += 1;
         shown += 1;
       }
@@ -365,4 +378,63 @@ export async function runYield(admin: AdminClient): Promise<YieldResult> {
     if (!data || data.length < PAGE_SIZE) break;
   }
   return { live, shown, byProvider };
+}
+
+export interface ScaleStageResult {
+  eventsScanned: number;
+  large: number;
+  community: number;
+  unknown: number;
+  updated: number;
+  errors: string[];
+}
+
+// Writes events.scale / scale_reasons from lib/scale.ts. Runs after dedup
+// and before classification, so classification can skip community-culture
+// for large events and the public gate can hide them. Only rows whose
+// result changed are written.
+export async function runScale(admin: AdminClient): Promise<ScaleStageResult> {
+  interface Row {
+    id: string;
+    title: string;
+    description: string | null;
+    price_max: number | null;
+    source_provider: string;
+    scale: string | null;
+    scale_reasons: string[] | null;
+    venues: { name: string; capacity: number | null } | null;
+  }
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from("events")
+      .select("id, title, description, price_max, source_provider, scale, scale_reasons, venues(name, capacity)")
+      .eq("status", "published")
+      .eq("is_duplicate", false)
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<Row[]>();
+    if (error) throw new Error(`Scale pass failed: ${error.message}`);
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
+  const result: ScaleStageResult = { eventsScanned: rows.length, large: 0, community: 0, unknown: 0, updated: 0, errors: [] };
+  for (const row of rows) {
+    const { scale, reasons } = assessScale({
+      title: row.title,
+      description: row.description,
+      sourceProvider: row.source_provider,
+      venueName: row.venues?.name ?? null,
+      venueCapacity: row.venues?.capacity ?? null,
+      priceMax: row.price_max,
+    });
+    result[scale] += 1;
+    const unchanged = row.scale === scale && (row.scale_reasons ?? []).join("|") === reasons.join("|");
+    if (unchanged) continue;
+    const { error } = await admin.from("events").update({ scale, scale_reasons: reasons }).eq("id", row.id);
+    if (error) result.errors.push(`event ${row.id}: ${error.message}`);
+    else result.updated += 1;
+  }
+  return result;
 }

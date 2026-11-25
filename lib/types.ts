@@ -60,6 +60,8 @@ export interface EventListItem {
     lat: number | null;
     lng: number | null;
   } | null;
+  /** lib/scale.ts — absent/null until runScale has scored it. */
+  scale?: string | null;
   event_buckets: {
     confidence: number;
     assigned_by: string;

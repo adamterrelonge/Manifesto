@@ -8,6 +8,7 @@ import {
   runQualityScoring,
   runPrune,
   runYield,
+  runScale,
 } from "@/lib/pipeline";
 import { runNotificationDelivery } from "@/lib/notifications";
 import { mapWithConcurrency } from "@/lib/sources/scrape-utils";
@@ -383,7 +384,17 @@ async function ingestSkiddle(admin: AdminClient): Promise<SourceResult> {
   return { fetched: raw.length, upserted, errors };
 }
 
+// Off since 2026-11-25 (docs/INGESTION_EXPANSION_PLAN.md Phase 2b): its
+// 811 live events sat in 274 venues — West End theatres, arenas, O2
+// Academies — all 300+ capacity, none shown to users, and lib/scale.ts marks
+// the whole provider 'large'. Ingesting it only cost ~800 upserts a run.
+// Flip to true to bring it back (e.g. with a narrowed query).
+const TICKETMASTER_ENABLED = false;
+
 async function ingestTicketmaster(admin: AdminClient): Promise<SourceResult> {
+  if (!TICKETMASTER_ENABLED) {
+    return { fetched: 0, upserted: 0, errors: [], skipped: "disabled: mass-market inventory (all venues 300+), see lib/scale.ts" };
+  }
   const today = new Date();
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + 8);
@@ -2048,6 +2059,15 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     dedup = { error: (err as Error).message };
   }
 
+  // After dedup, before classify: classification skips community-culture
+  // for large events, so scale must be current first.
+  let scale: Awaited<ReturnType<typeof runScale>> | { error: string };
+  try {
+    scale = await runScale(admin);
+  } catch (err) {
+    scale = { error: (err as Error).message };
+  }
+
   let classify: Awaited<ReturnType<typeof runClassification>> | { error: string };
   try {
     classify = await runClassification(admin);
@@ -2197,6 +2217,7 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     },
     expiry,
     dedup,
+    scale,
     classify,
     categoryInference,
     quality,
