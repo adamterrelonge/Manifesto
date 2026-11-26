@@ -127,6 +127,7 @@ export const PROVIDER_MISSIONS: Record<string, SourceMission> = {
   "new-art-exchange": { buckets: ["poc"], confidence: 0.85, basis: "mission: New Art Exchange, global majority contemporary arts" },
   dadafest: { buckets: ["disability-friendly"], confidence: 0.9, basis: "mission: DaDaFest, disability and Deaf arts" },
   "shape-arts": { buckets: ["disability-friendly"], confidence: 0.9, basis: "mission: Shape Arts, disability-led arts organisation" },
+  sampad: { buckets: ["south-asian"], confidence: 0.85, basis: "mission: Sampad, South Asian arts and heritage, Birmingham" },
 };
 
 export interface SourceMissionLookup {

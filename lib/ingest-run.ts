@@ -23,6 +23,9 @@ import {
   normaliseSerpentineEvent,
 } from "@/lib/sources/serpentine";
 import { fetchSkiddleEvents, normaliseSkiddleEvent } from "@/lib/sources/skiddle";
+import { fetchSpektrixEvents, normaliseSpektrixEvent, type SpektrixVenueConfig } from "@/lib/sources/spektrix";
+import { fetchTribeEvents, normaliseTribeEvent, type TribeSiteConfig } from "@/lib/sources/tribe-events";
+import { SPEKTRIX_VENUES, TRIBE_SITES, sourceKey } from "@/lib/sources/platform-venues";
 import {
   fetchTicketmasterEvents,
   normaliseTicketmasterEvent,
@@ -365,14 +368,23 @@ async function ingestSkiddle(admin: AdminClient): Promise<SourceResult> {
   // running out of results. Barbican already pages up to 20 deep within
   // the same maxDuration=60s budget below, so this has headroom.
   const MAX_PAGES = 6;
+  const errors: string[] = [];
   for (let page = 0; page < MAX_PAGES; page++) {
-    const batch = await fetchSkiddleEvents({ minDate, maxDate, offset: page * 100 });
+    let batch: SkiddleEvent[];
+    try {
+      batch = await fetchSkiddleEvents({ minDate, maxDate, offset: page * 100 });
+    } catch (err) {
+      // A later page failing (after retries) keeps the pages already fetched;
+      // only a failure on the first page fails the whole source.
+      if (page === 0) throw err;
+      errors.push(`page ${page}: ${(err as Error).message}`);
+      break;
+    }
     raw.push(...batch);
     if (batch.length < 100) break;
   }
 
   let upserted = 0;
-  const errors: string[] = [];
   for (const rawEvent of raw) {
     try {
       await upsertNormalisedEvent(admin, normaliseSkiddleEvent(rawEvent));
@@ -383,6 +395,42 @@ async function ingestSkiddle(admin: AdminClient): Promise<SourceResult> {
   }
   return { fetched: raw.length, upserted, errors };
 }
+
+async function upsertAll<T>(
+  admin: AdminClient,
+  raw: T[],
+  normalise: (item: T) => Parameters<typeof upsertNormalisedEvent>[1],
+  id: (item: T) => string
+): Promise<SourceResult> {
+  let upserted = 0;
+  const errors: string[] = [];
+  for (const item of raw) {
+    try {
+      await upsertNormalisedEvent(admin, normalise(item));
+      upserted += 1;
+    } catch (err) {
+      errors.push(`event ${id(item)}: ${(err as Error).message}`);
+    }
+  }
+  return { fetched: raw.length, upserted, errors };
+}
+
+// Phase 4 platform venues (lib/sources/platform-venues.ts): one config
+// entry each, through the shared Spektrix / Events Calendar adapters.
+async function ingestSpektrixVenue(admin: AdminClient, config: SpektrixVenueConfig): Promise<SourceResult> {
+  const raw = await fetchSpektrixEvents(config);
+  return upsertAll(admin, raw, (e) => normaliseSpektrixEvent(config, e), (e) => e.event.id);
+}
+
+async function ingestTribeSite(admin: AdminClient, config: TribeSiteConfig): Promise<SourceResult> {
+  const raw = await fetchTribeEvents(config);
+  return upsertAll(admin, raw, (e) => normaliseTribeEvent(config, e), (e) => String(e.id));
+}
+
+const PLATFORM_SOURCES: { provider: string; run: (admin: AdminClient) => Promise<SourceResult> }[] = [
+  ...SPEKTRIX_VENUES.map((c) => ({ provider: c.provider, run: (a: AdminClient) => ingestSpektrixVenue(a, c) })),
+  ...TRIBE_SITES.map((c) => ({ provider: c.provider, run: (a: AdminClient) => ingestTribeSite(a, c) })),
+];
 
 // Off since 2026-11-25 (docs/INGESTION_EXPANSION_PLAN.md Phase 2b): its
 // 811 live events sat in 274 venues — West End theatres, arenas, O2
@@ -1939,6 +1987,7 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     holburneMuseum,
     wolverhamptonArtGallery,
     nottinghamContemporary,
+    ...platformResults
   ] = await mapWithConcurrency(
     [
     () => runSource("barbican", () => ingestBarbican(admin)),
@@ -2035,6 +2084,7 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
     () => runSource("holburne-museum", () => ingestHolburneMuseum(admin)),
     () => runSource("wolverhampton-art-gallery", () => ingestWolverhamptonArtGallery(admin)),
     () => runSource("nottingham-contemporary", () => ingestNottinghamContemporary(admin)),
+    ...PLATFORM_SOURCES.map((s) => () => runSource(s.provider, () => s.run(admin))),
     ],
     INGEST_SOURCE_CONCURRENCY,
     (run) => run()
@@ -2214,6 +2264,7 @@ export async function runIngest(admin: AdminClient = createAdminClient()) {
       holburneMuseum,
       wolverhamptonArtGallery,
       nottinghamContemporary,
+      ...Object.fromEntries(PLATFORM_SOURCES.map((s, i) => [sourceKey(s.provider), platformResults[i]])),
     },
     expiry,
     dedup,

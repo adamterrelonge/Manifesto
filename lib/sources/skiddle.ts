@@ -83,14 +83,7 @@ export async function fetchSkiddleEvents(
   url.searchParams.set("limit", String(params.limit ?? 100));
   url.searchParams.set("offset", String(params.offset ?? 0));
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(
-      `Skiddle API error: ${res.status} ${res.statusText} — ${await res.text()}`
-    );
-  }
-
-  const data = (await res.json()) as SkiddleSearchResponse;
+  const data = await fetchJsonWithRetry(url.toString());
 
   if (process.env.NODE_ENV !== "production" && data.results?.[0]) {
     console.log(
@@ -100,6 +93,32 @@ export async function fetchSkiddleEvents(
   }
 
   return data.results ?? [];
+}
+
+const SKIDDLE_ATTEMPTS = 3;
+
+// Run 45715934313 (2026-11-25) lost the whole source to one 200 response
+// with an empty body ("Unexpected end of JSON input"); the next request
+// worked. Empty/unparseable bodies, 429 and 5xx are retried with backoff;
+// other errors (bad key, 4xx) fail at once.
+async function fetchJsonWithRetry(url: string): Promise<SkiddleSearchResponse> {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= SKIDDLE_ATTEMPTS; attempt++) {
+    if (attempt > 1) await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 2)));
+    const res = await fetch(url);
+    const body = await res.text();
+    if (!res.ok) {
+      lastError = new Error(`Skiddle API error: ${res.status} ${res.statusText} — ${body.slice(0, 200)}`);
+      if (res.status === 429 || res.status >= 500) continue;
+      throw lastError;
+    }
+    try {
+      return JSON.parse(body) as SkiddleSearchResponse;
+    } catch {
+      lastError = new Error(`Skiddle returned ${body.length === 0 ? "an empty body" : "invalid JSON"} (attempt ${attempt}/${SKIDDLE_ATTEMPTS})`);
+    }
+  }
+  throw lastError!;
 }
 
 function toNumber(value: string | number | undefined): number | null {

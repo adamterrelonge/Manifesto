@@ -298,6 +298,19 @@ its `basis` recorded.
 **Done when:** ≥ 20 new sources live, each with non-zero shown events in the
 health report or a documented reason.
 
+**Status (2026-11-26):** 30 new sources through two shared adapters —
+Spektrix (25 venues) and WordPress Events Calendar (5) — configured in
+`lib/sources/platform-venues.ts`; per-source results and every rejected
+candidate are in `docs/SCRAPE_TARGETS.md` Round 5. Dry run: 208 events in
+the window, none `large`; 78 pass `community-culture` by source or format
+before identity buckets. 18 sources allow-listed as community-anchored,
+Sampad via its south-asian mission; the 11 not allow-listed (indie cinemas,
+larger or mixed houses) rely on format and identity matches. Bespoke
+scrapers for the remaining candidates (Genesis, Rio, Gay's the Word,
+Kakilang…) are the next increment. Also fixed: run 45715934313 lost all of
+Skiddle to one empty 200 response — `lib/sources/skiddle.ts` now retries,
+and a later page failing keeps the pages already fetched.
+
 ## Phase 5 — Measure and tune
 
 - Health report trend over 2 weeks: shown count, shown-per-source, scale

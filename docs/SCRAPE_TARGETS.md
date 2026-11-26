@@ -274,6 +274,68 @@ for full per-venue detail.
 
 ---
 
+## Round 5 — Phase 4 platform adapters (resolved 2026-11-26)
+
+`docs/INGESTION_EXPANSION_PLAN.md` Phase 4. Instead of one scraper per
+venue, two shared adapters read a ticketing/CMS platform's public API; each
+venue is one entry in `lib/sources/platform-venues.ts`:
+
+- **Spektrix** (`lib/sources/spektrix.ts`) — `{ticket host}/{client}/api/v3/events`,
+  public and unauthenticated. Find the client by searching a venue's pages
+  for `/{client}/website/` or `system.spektrix.com/{client}`, or try
+  `https://system.spektrix.com/{guess}/api/v3/events`.
+- **The Events Calendar** (`lib/sources/tribe-events.ts`) — WordPress
+  `/wp-json/tribe/events/v1/events`.
+
+"CC" = allow-listed as community-anchored (`lib/community-culture.ts`);
+"week" = events in the 8-day window on 2026-11-26 after filters.
+
+| Source | Platform | Week | CC | Notes |
+|---|---|---|---|---|
+| Bishopsgate Institute | Spektrix | 3 | ✅ | online sessions, "Reading Room" and termly courses filtered |
+| Rich Mix | Spektrix | 2 | ✅ | cinema sold elsewhere; only live events in the API |
+| Artsadmin (Toynbee Studios) | Spektrix | 1 | ✅ | |
+| Bush Theatre | Spektrix | 2 | ✅ | access add-ons filtered |
+| Theatre503 | Spektrix | 3 | ✅ | |
+| Camden People's Theatre | Spektrix | 5 | ✅ | |
+| The Albany | Spektrix | 1 | ✅ | "Creative Communities" coworking filtered |
+| Arcola Theatre | Spektrix | 1 | ✅ | |
+| Jacksons Lane | Spektrix | 4 | ✅ | |
+| Omnibus Theatre | Spektrix | 4 | ✅ | robots blocks PetalBot only |
+| Park Theatre | Spektrix | 4 | ✅ | `***` add-ons and online events filtered |
+| Southwark Playhouse | Spektrix | 3 | ✅ | |
+| Tobacco Factory Theatres | Spektrix | 3 | ✅ | |
+| Exeter Phoenix | Spektrix | 19 | ✅ | |
+| Kiln Theatre | Spektrix | 6 | — | 292 seats, receiving house |
+| The Place | Spektrix | 5 | — | termly classes filtered; mostly training |
+| Contact | Spektrix | 1 | — | main house ~300 |
+| The MAC, Belfast | Spektrix | 3 | — | Main Stage filtered |
+| Soho Theatre | Spektrix | 9 | — | Dean Street only; Walthamstow (~1,000) filtered |
+| Battersea Arts Centre | Spektrix | 3 | — | Grand Hall ~600 |
+| artsdepot | Spektrix | 11 | — | main house ~395 |
+| Hyde Park Picture House | Spektrix | 13 | — | shared account: Leeds Grand + City Varieties filtered |
+| Broadway Cinema, Nottingham | Spektrix | 18 | — | mainstream releases dominate |
+| QUAD, Derby | Spektrix | 19 | — | as Broadway |
+| Tyneside Cinema | Spektrix | 42 | — | as Broadway |
+| Chats Palace | Events Calendar | 8 | ✅ | |
+| Housmans Bookshop | Events Calendar | 2 | ✅ | |
+| The Stove, Dumfries | Events Calendar | 4 | ✅ | |
+| Wharf Chambers, Leeds | Events Calendar | 9 | ✅ | |
+| Sampad | Events Calendar | 0 | mission: south-asian | nothing in this week's window (8 upcoming) |
+
+Not added, with reason:
+
+| Candidate | Reason |
+|---|---|
+| Cinema Museum, Darbar, London Museum (Docklands), MayDay Rooms, Cornerstone, New Diorama | robots.txt names ClaudeBot / AI crawlers |
+| Unlimited | robots.txt blanket-blocks a long bot list incl. "aibot" — treated as a block |
+| Northern Stage (450), Theatre Royal Winchester (~400), Cambridge Junction (J1 ~850), Hackney Empire, Stratford East | 300+ |
+| Gate Theatre | Spektrix works, but nothing on sale in the window — re-check |
+| Genesis, Rio, Deptford Cinema, Star & Shadow, Cube, Gay's the Word, Kakilang, Five Leaves, Phoenix Leicester, Plymouth Arts Cinema, Theatre Peckham, Homotopia, Stuart Hall Foundation, Graeae, Corali, Club Soda (Tickettailor) | no shared platform found — each needs a bespoke scraper |
+| CCA Glasgow, The Showroom, Tramway, Watershed | 403 / timeout from Node |
+| Chinese Arts Now, Latin American House, Kala Sangam, VFD | domain or TLS error |
+| Bernie Grant Arts Centre | Spektrix client found but its API host refused the connection |
+
 ## Community & inclusion-focused (highest priority)
 
 These are the venues most directly aligned with the product's core mission
@@ -524,7 +586,7 @@ engagement programmes — likely highest event volume of any tier here.
 | Name | City | Notes |
 |---|---|---|
 | Ulster Museum | Belfast | National Museums NI — ❌ Blocked, client-rendered (Next.js, but event data not in initial props), see Status table above |
-| MAC (Metropolitan Arts Centre) | Belfast | ❌ Blocked, client-rendered, see Status table above |
+| MAC (Metropolitan Arts Centre) | Belfast | ✅ Implemented via the Spektrix API (`lib/sources/platform-venues.ts`, 2026-11-26) — the page is client-rendered but its ticketing API is public; Main Stage (~350) filtered out |
 | Golden Thread Gallery | Belfast | ✅ Implemented (`lib/sources/golden-thread-gallery.ts`) |
 | Ulster Folk Museum / Ulster Transport Museum | Cultra | National Museums NI — ❌ Blocked, same NMNI backend as Ulster Museum |
 | Void Gallery | Derry/Londonderry | ❌ Blocked, client-rendered listing, see Status table above |

@@ -128,6 +128,32 @@ export const COMMUNITY_ANCHORED_PROVIDERS: Record<string, string> = {
   "shape-arts": "disability-led arts organisation",
   dadafest: "disability and Deaf arts organisation",
   "bio-link": "curated independent creators (lib/sources/bio-link-seeds.ts)",
+  // Phase 4 platform venues (lib/sources/platform-venues.ts). Left out on
+  // purpose: Broadway, Hyde Park Picture House and QUAD (indie cinemas whose
+  // weeks are mostly mainstream releases — their Q&As, film clubs and Lates
+  // still qualify by format), Kiln (292 seats, a receiving house), The Place
+  // (mostly classes), Contact (main house ~300), The MAC (panto and touring),
+  // Tyneside Cinema (as the cinemas above), Soho Theatre (commercial comedy
+  // club), Battersea Arts Centre (Grand Hall ~600) and artsdepot (main
+  // house ~395).
+  "chats-palace": "community arts centre, Homerton",
+  housmans: "radical bookshop, talks and book launches, King's Cross",
+  "the-stove": "artist-led community arts network, Dumfries",
+  "wharf-chambers": "workers' co-operative members' club and venue, Leeds",
+  "rich-mix": "independent community arts centre, Bethnal Green",
+  artsadmin: "artist-led organisation, Toynbee Studios",
+  "bishopsgate-institute": "independent library and archive: talks, tours, classes",
+  theatre503: "new-writing theatre above a pub, ~60 seats",
+  "bush-theatre": "new-writing theatre, ~180 seats",
+  "tobacco-factory-theatres": "independent theatre, ~250 seats, Bristol",
+  "exeter-phoenix": "community arts centre, Exeter",
+  "camden-peoples-theatre": "fringe theatre for new and local work, ~60 seats",
+  "the-albany": "community arts centre, Deptford",
+  "arcola-theatre": "independent community theatre, Dalston",
+  "jacksons-lane": "community arts centre, Highgate",
+  "omnibus-theatre": "independent theatre, ~100 seats, Clapham",
+  "park-theatre": "independent theatre, 200 + 90 seats, Finsbury Park",
+  "southwark-playhouse": "independent theatre, Elephant & Castle",
 };
 
 /** Keyed by Eventbrite organiser id (lib/sources/eventbrite-organisers.ts).
