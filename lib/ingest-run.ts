@@ -1836,12 +1836,13 @@ async function runSource(
     // undici's "fetch failed" hides the real reason (DNS, TLS, redirect
     // loop) in .cause — surface it so the health report is actionable.
     const message = err_.cause?.message ? `${err_.message} (${err_.cause.message})` : err_.message;
-    if (process.env.GITHUB_ACTIONS && CI_IP_BLOCKED_SOURCES.has(name) && /\b(403|405)\b/.test(message)) {
+    const ciBlockPattern = CI_IP_BLOCKED_SOURCES[name];
+    if (process.env.GITHUB_ACTIONS && ciBlockPattern?.test(message)) {
       return {
         fetched: 0,
         upserted: 0,
         errors: [],
-        skipped: `blocks GitHub Actions runner IPs (${message.slice(0, 80)}) — works from a home connection`,
+        skipped: `refuses GitHub Actions runners (${message.slice(0, 160)}) — works from a home connection`,
         provider,
       };
     }
@@ -1862,8 +1863,20 @@ async function runSource(
 // every run, so they come back on their own if the block lifts; while it
 // holds, a 403/405 in CI is reported as `skipped`, not `broken` (which would
 // fail the job daily). Any other error still counts as broken.
-// the-stove: Cloudflare 403s runner IPs on its whole site (run 45840712059).
-const CI_IP_BLOCKED_SOURCES = new Set(["serpentine", "fact-liverpool", "ladbroke-hall", "sainsbury-centre", "the-stove"]);
+const IP_BLOCK = /\b(403|405)\b/;
+const CI_IP_BLOCKED_SOURCES: Record<string, RegExp> = {
+  serpentine: IP_BLOCK,
+  "fact-liverpool": IP_BLOCK,
+  "ladbroke-hall": IP_BLOCK,
+  "sainsbury-centre": IP_BLOCK,
+  // Cloudflare 403s runner IPs on its whole site (run 45840712059).
+  "the-stove": IP_BLOCK,
+  // Empty 200s to runners on every retry (runs 45870565325, 45873552785)
+  // while the same request works from home; it worked from CI earlier the
+  // same day, so it's still tried every run. Only an empty body is excused —
+  // a bad key, 4xx or 5xx still counts as broken.
+  skiddle: /empty body/,
+};
 
 // Running all ~90 sources fully in parallel (plain Promise.all) meant every
 // source's sequential per-event upsertVenue/upsertOrganiser/events.upsert

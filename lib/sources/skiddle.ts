@@ -1,6 +1,7 @@
 import type { NormalisedEvent } from "@/lib/types";
 import type { Category } from "@/lib/categories";
 import { normaliseUkRegion } from "@/lib/uk-region";
+import { REQUEST_HEADERS } from "./scrape-utils";
 
 // Request shape confirmed against https://github.com/Skiddle/web-api/wiki/Events-API.
 // Response field names below were reverse-engineered from live responses
@@ -108,8 +109,13 @@ async function fetchJsonWithRetry(url: string): Promise<SkiddleSearchResponse> {
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= SKIDDLE_ATTEMPTS; attempt++) {
     if (attempt > 1) await new Promise((r) => setTimeout(r, SKIDDLE_RETRY_DELAYS_MS[attempt - 2]));
-    const res = await fetch(url);
+    // Explicit UA/Accept: runs 45870565325 and 45873552785 got empty 200s
+    // from GitHub runners on every attempt while the same header-less
+    // request worked from a home connection.
+    const started = Date.now();
+    const res = await fetch(url, { headers: { ...REQUEST_HEADERS, Accept: "application/json" } });
     const body = await res.text();
+    const diag = `status ${res.status}, ${res.headers.get("content-type") ?? "no content-type"}, server ${res.headers.get("server") ?? "?"}, ${Date.now() - started}ms`;
     if (!res.ok) {
       lastError = new Error(`Skiddle API error: ${res.status} ${res.statusText} — ${body.slice(0, 200)}`);
       if (res.status === 429 || res.status >= 500) continue;
@@ -118,7 +124,9 @@ async function fetchJsonWithRetry(url: string): Promise<SkiddleSearchResponse> {
     try {
       return JSON.parse(body) as SkiddleSearchResponse;
     } catch {
-      lastError = new Error(`Skiddle returned ${body.length === 0 ? "an empty body" : "invalid JSON"} (attempt ${attempt}/${SKIDDLE_ATTEMPTS})`);
+      lastError = new Error(
+        `Skiddle returned ${body.length === 0 ? "an empty body" : "invalid JSON"} (attempt ${attempt}/${SKIDDLE_ATTEMPTS}; ${diag})`
+      );
     }
   }
   throw lastError!;
