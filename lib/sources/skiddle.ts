@@ -95,7 +95,10 @@ export async function fetchSkiddleEvents(
   return data.results ?? [];
 }
 
-const SKIDDLE_ATTEMPTS = 3;
+// Waits before attempts 2..4. Run 45870565325 got three empty bodies in
+// ~3s, so the waits now span about a minute.
+const SKIDDLE_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
+const SKIDDLE_ATTEMPTS = SKIDDLE_RETRY_DELAYS_MS.length + 1;
 
 // Run 45715934313 (2026-11-25) lost the whole source to one 200 response
 // with an empty body ("Unexpected end of JSON input"); the next request
@@ -104,7 +107,7 @@ const SKIDDLE_ATTEMPTS = 3;
 async function fetchJsonWithRetry(url: string): Promise<SkiddleSearchResponse> {
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= SKIDDLE_ATTEMPTS; attempt++) {
-    if (attempt > 1) await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 2)));
+    if (attempt > 1) await new Promise((r) => setTimeout(r, SKIDDLE_RETRY_DELAYS_MS[attempt - 2]));
     const res = await fetch(url);
     const body = await res.text();
     if (!res.ok) {

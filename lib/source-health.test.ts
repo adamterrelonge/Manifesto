@@ -32,6 +32,13 @@ describe("assessSourceHealth", () => {
     expect(statusOf({ a: run(0, { fatal: "fetch failed", errors: ["a fetch failed"] }) })).toEqual({ a: "broken" });
   });
 
+  it("warns on a single failed run after a healthy one, and breaks on the second", () => {
+    const failed = run(0, { fatal: "Skiddle returned an empty body", errors: ["x"] });
+    const h1 = [entry({ a: run(600) })];
+    expect(statusOf({ a: failed }, h1)).toEqual({ a: "warn" });
+    expect(statusOf({ a: failed }, [...h1, entry({ a: failed })])).toEqual({ a: "broken" });
+  });
+
   it("marks a deliberately skipped source as skipped, not broken", () => {
     expect(statusOf({ a: run(0, { skipped: "token not set" }) }, [entry({ a: run(10) })])).toEqual({ a: "skipped" });
   });

@@ -7,8 +7,10 @@
 // into:
 //
 //   broken   — fails the job, so GitHub emails the repo owner:
-//              the whole source threw, it dropped to 0 after returning
-//              events last run, or most fetched events failed to upsert.
+//              the whole source threw two runs running (or with no
+//              history), it dropped to 0 after returning events last run,
+//              or most fetched events failed to upsert. A single throw
+//              after a healthy run is `warn`.
 //   warn     — worth a look, doesn't fail the job: per-event errors, a
 //              sharp drop against its recent median, or empty for a long
 //              stretch.
@@ -129,7 +131,15 @@ export function assessSourceHealth(
       continue;
     }
     if (snap.fatal) {
-      results.push(health("broken", `whole source failed: ${snap.fatal}`));
+      // One failed run after a healthy one is usually the upstream having a
+      // bad moment (Skiddle's empty responses, runs 45715934313 and
+      // 45870565325) — warn, and fail the job only if it fails again. A
+      // source with no history (new, never confirmed working) fails at once.
+      if (prev && !prev.fatal && !prev.skipped) {
+        results.push(health("warn", `whole source failed this run (broken if it fails again): ${snap.fatal}`));
+      } else {
+        results.push(health("broken", `whole source failed${prev?.fatal ? " 2 runs running" : ""}: ${snap.fatal}`));
+      }
       continue;
     }
 
