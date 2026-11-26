@@ -193,7 +193,9 @@ export const SPEKTRIX_VENUES: SpektrixVenueConfig[] = [
   {
     provider: "camden-peoples-theatre",
     name: "Camden People's Theatre",
-    apiBase: "https://tickets.cptheatre.co.uk/camdenpeoplestheatre",
+    // Not tickets.cptheatre.co.uk: Cloudflare there 403s GitHub runner IPs
+    // (run 45840712059); the same account answers on Spektrix's own host.
+    apiBase: "https://system.spektrix.com/camdenpeoplestheatre",
     whatsOnUrl: "https://www.cptheatre.co.uk/",
     venue: london("Camden People's Theatre", "58-60 Hampstead Road", "NW1 2PY"),
     category: "theatre-performance",

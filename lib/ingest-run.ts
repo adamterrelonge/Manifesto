@@ -1862,7 +1862,8 @@ async function runSource(
 // every run, so they come back on their own if the block lifts; while it
 // holds, a 403/405 in CI is reported as `skipped`, not `broken` (which would
 // fail the job daily). Any other error still counts as broken.
-const CI_IP_BLOCKED_SOURCES = new Set(["serpentine", "fact-liverpool", "ladbroke-hall", "sainsbury-centre"]);
+// the-stove: Cloudflare 403s runner IPs on its whole site (run 45840712059).
+const CI_IP_BLOCKED_SOURCES = new Set(["serpentine", "fact-liverpool", "ladbroke-hall", "sainsbury-centre", "the-stove"]);
 
 // Running all ~90 sources fully in parallel (plain Promise.all) meant every
 // source's sequential per-event upsertVenue/upsertOrganiser/events.upsert
